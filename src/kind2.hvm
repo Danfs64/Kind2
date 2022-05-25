@@ -1784,6 +1784,186 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     ((Compile.to_khvm body)
     x))
 
+// (Term.Compile term:Term file:File) : String
+(Term.Compile file term) = ((Term.Compile.Go term file) "")
+//   (Term.Compile.Go (Var name) file) =
+//     λx((String.Show.Go (Name.GetString name))
+//       x)
+//   (Term.Compile.Go (Use name uses) file) =
+//     λx((String.Show.Go "$")
+//       ((String.Show.Go (Name.GetString name))
+//       x))
+//   (Term.Compile.Go (Met hash) file) =
+//     λx((String.Show.Go "_")
+//       ((String.Show.Go (U32.Show hash))
+//       x))
+//   (Term.Compile.Go (Let name expr body) file) =
+//     λx((String.Show.Go "let ")
+//       ((String.Show.Go (Name.GetString name))
+//       ((String.Show.Go " = ")
+//       ((Term.Compile.Go expr file)
+//       ((String.Show.Go "; ")
+//       ((Term.Compile.Go body file)
+//       x))))))
+//   (Term.Compile.Go (Ann xval xtyp) file) =
+//     λx((String.Show.Go "(")
+//       ((Term.Compile.Go xval file)
+//       ((String.Show.Go " :: ")
+//       ((Term.Compile.Go xtyp file)
+//       ((String.Show.Go ")")
+//       x)))))
+//   (Term.Compile.Go Typ file) =
+//     λx((String.Show.Go "Type")
+//       x)
+//   (Term.Compile.Go U32 file) =
+//     λx((String.Show.Go "U32")
+//       x)
+//   (Term.Compile.Go (N32 numb) file) =
+//     λx((String.Show.Go (U32.Show numb))
+//       x)
+//   (Term.Compile.Go (O32 oper val0 val1) file) =
+//     λx((String.Show.Go "(")
+//       ((Oper.Show.Go oper)
+//       ((String.Show.Go " ")
+//       ((Term.Compile.Go val0 file)
+//       ((String.Show.Go " ")
+//       ((Term.Compile.Go val1 file)
+//       ((String.Show.Go ")")
+//       x)))))))
+//   (Term.Compile.Go (Ask name) file) =
+//     λx((String.Show.Go "?")
+//       ((String.Show.Go name)
+//       x))
+//   (Term.Compile.Go (All name type body) file) =
+//     λx((String.Show.Go "∀(")
+//       ((String.Show.Go (Name.GetString name))
+//       ((String.Show.Go ": ")
+//       ((Term.Compile.Go type file)
+//       ((String.Show.Go ") ")
+//       ((Term.Compile.Go body file)
+//       x))))))
+//   (Term.Compile.Go (Lam name body) file) =
+//     λx((String.Show.Go "λ")
+//       ((String.Show.Go (Name.GetString name))
+//       ((String.Show.Go " ")
+//       ((Term.Compile.Go body file)
+//       x))))
+//   (Term.Compile.Go (App func argm) file) =
+//     λx((String.Show.Go "(")
+//       ((Term.Compile.Go func file)
+//       ((String.Show.Go " ")
+//       ((Term.Compile.Go argm file)
+//       ((String.Show.Go ")")
+//       x)))))
+  (Term.Compile.Go (Cts ctid args) file) =
+    λx((String.Show.Go "(")
+      ((Term.Compile.Go.CtrName ctid file)
+      ((Term.Compile.Go.Cts.Args args file)
+      ((String.Show.Go ")")
+      x))))
+//   (Term.Compile.Go (Eql val0 val1) file) =
+//     λx((Term.Compile.Go val0 file)
+//       ((String.Show.Go " == ")
+//       ((Term.Compile.Go val1 file)
+//       x)))
+//   (Term.Compile.Go (Rfl expr) file) =
+//     λx((String.Show.Go "refl ")
+//       ((Term.Compile.Go expr file)
+//       x))
+//   (Term.Compile.Go (Rwt name witn goal expr) file) =
+//     λx((String.Show.Go "rewrite ")
+//       ((String.Show.Go (Name.GetString name))
+//       ((String.Show.Go "with ")
+//       ((Term.Compile.Go witn file)
+//       ((String.Show.Go "in ")
+//       ((Term.Compile.Go goal file)
+//       ((String.Show.Go " ")
+//       ((Term.Compile.Go expr file)
+//       x))))))))
+  (Term.Compile.Go.CtrName id file) =
+    (Maybe.Case (File.IdToName file id)
+      (String.Show.Go (U32.Show id))
+      λname (String.Show.Go name))
+  (Term.Compile.Go.Cts.Args Nil file) =
+    λx(x)
+  (Term.Compile.Go.Cts.Args (Cons arg args) file) =
+    λx((String.Show.Go " ")
+      ((Term.Compile.Go arg file)
+      ((Term.Compile.Go.Cts.Args args file)
+      x)))
+  (String.Show.Go xs) =
+    λx(String.Concat xs x)
+
+//   (Oper.Show.Go ADD) = (String.Show.Go "+")
+//   (Oper.Show.Go SUB) = (String.Show.Go "-")
+//   (Oper.Show.Go MUL) = (String.Show.Go "*")
+//   (Oper.Show.Go DIV) = (String.Show.Go "/")
+//   (Oper.Show.Go MOD) = (String.Show.Go "%")
+//   (Oper.Show.Go AND) = (String.Show.Go "&")
+//   (Oper.Show.Go OR)  = (String.Show.Go "|")
+//   (Oper.Show.Go XOR) = (String.Show.Go "^")
+//   (Oper.Show.Go SHL) = (String.Show.Go "<<")
+//   (Oper.Show.Go SHR) = (String.Show.Go ">>")
+//   (Oper.Show.Go LTN) = (String.Show.Go "<")
+//   (Oper.Show.Go LTE) = (String.Show.Go "<=")
+//   (Oper.Show.Go EQL) = (String.Show.Go "==")
+//   (Oper.Show.Go GTE) = (String.Show.Go ">=")
+//   (Oper.Show.Go GTN) = (String.Show.Go ">")
+//   (Oper.Show.Go NEQ) = (String.Show.Go "!=")
+
+// (Context.Show Nil file) = ""
+// (Context.Show ctx file) =
+//   let ctx = (List.Reverse ctx)
+//   let build = λz
+//     ((String.Show.Go "Context:")
+//     ((String.Show.Go NewLine)
+//     ((Context.Show.Go ctx file)
+//       z)))
+//   (build "")
+
+//   (Context.Show.Go Nil file) = λz(z)
+//   (Context.Show.Go (Cons (Pair name type) rest) file) =
+//     λz((String.Show.Go "- ")
+//       ((String.Show.Go (Name.GetString name))
+//       ((String.Show.Go " : ") 
+//       ((Term.Compile.Go type file)
+//       ((String.Show.Go NewLine)
+//       ((Context.Show.Go rest file)
+//       z))))))
+
+// (File.Show file) = ((File.Show.Go (Array.ToList (File.GetFuncs file)) file) "")
+//   (File.Show.Go Nil file) =
+//     λz(z)
+//   (File.Show.Go (Cons (Func lhs.t lhs.r rules) funs) file) =
+//     λz((Term.Compile.Go lhs.t file)
+//       ((String.Show.Go " : ")
+//       ((Term.Compile.Go lhs.r file)
+//       ((String.Show.Go NewLine)
+//       ((Rules.Show.Go rules file)
+//       ((String.Show.Go NewLine)
+//       ((File.Show.Go funs file)
+//       z)))))))
+//   (Rules.Show.Go End file) =
+//     λx(x)
+//   (Rules.Show.Go (Rule lhs rhs rules) file) =
+//     λx((Term.Compile.Go lhs file)
+//       ((String.Show.Go " = ")
+//       ((Term.Compile.Go rhs file)
+//       ((String.Show.Go NewLine)
+//       ((Rules.Show.Go rules file)
+//       x)))))
+
+// (U32.Show U32) : String
+// (U32.Show n) = (U32.ShowBuild n StrNil)
+//   (U32.ShowBuild n str) = 
+//     let next = (StrCons (+ 48 (% n 10)) str)
+//     ((U32.If (< n 10) λx(x) λx(U32.ShowBuild (/ n 10) x)) next)
+
+// (U32.Read String) : U32
+// (U32.Read str) = (U32.Read.Go str 0)
+//   (U32.Read.Go StrNil         r) = r
+//   (U32.Read.Go (StrCons x xs) r) = (U32.If (& (<= '0' x) (<= x '9')) (U32.Read.Go xs (+ (* r 10) (- x '0'))) 0)
+
 
 // #############################################################################
 // # Tests                                                                     #
@@ -1920,5 +2100,90 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Kind2.Run.Go (Er err)  expr) = err
   (Kind2.Run.Go (Ok file) expr) = (Term.Show file (Normal file (Term.Read file expr)))
 
-(Main n) = (Kind2.Check Test.0)
-//(Main n) = (Kind2.Run Test.0)
+// (Kind2.CompileKDL code) = (Kind2.CompileKDL.Go (File.Read code))
+//   (Kind2.CompileKDL.Go (Er err )) = err
+//   (Kind2.CompileKDL.Go (Ok file)) = (Term.Compile file)
+
+// (Main n) = (Kind2.Check Test.0)
+// (Main n) = (Kind2.Run Test.0)
+
+(GetFile  (Ok   f)) = f
+(GetMaybe (Some x)) = x
+
+(Rule.LHS  (Rule lhs rhs xs)) = lhs
+(Rule.RHS  (Rule lhs rhs xs)) = rhs
+(Rule.Next (Rule lhs rhs xs)) = xs
+
+(File.NameToFunc file name) = (File.NameToFunc.Go file (File.NameToId file name))
+  (File.NameToFunc.Go file (None   )) = None
+  (File.NameToFunc.Go file (Some id)) = (Pair.Snd (File.GotFunc file id))
+
+(Main) =
+  let code = "
+    // Booleans
+    Bool : Type
+      True  : Bool
+      False : Bool
+
+    // Natural numbers
+    Nat : Type
+      Zero         : Nat
+      (Succ n:Nat) : Nat
+
+    // Lists
+    (List t:Type) : Type
+      (Nil t:Type)                  : (List t)
+      (Cons t:Type x:t xs:(List t)) : (List t)
+
+    // Negates a boolean
+    (Bool.Not b:Bool) : Bool
+      (Bool.Not True)  = False
+      (Bool.Not False) = True
+
+    // Doubles a number
+    (Nat.Double n:Nat) : Nat
+      (Nat.Double Zero)     = Zero
+      (Nat.Double (Succ n)) = (Succ (Succ (Nat.Double n)))
+
+    // Halves a number
+    (Nat.Half n:Nat) : Nat
+      (Nat.Half Zero)            = Zero
+      (Nat.Half (Succ Zero))     = Zero
+      (Nat.Half (Succ (Succ x))) = (Succ (Nat.Half x))
+
+    // Computes 2^n
+    (Nat.Pow2 n:Nat) : Nat
+      (Nat.Pow2 Zero)     = (Succ Zero)
+      (Nat.Pow2 (Succ n)) = (Nat.Double (Nat.Pow2 n)) 
+
+    // Destroys a Nat into 0
+    (Nat.Destroy n:Nat) : Nat
+      (Nat.Destroy Zero)     = Zero
+      (Nat.Destroy (Succ n)) = (Nat.Destroy n)
+
+    // Returns the first element of a list
+    (List.Head t:Type x:(List t)) : t
+      (List.Head t (Cons t x xs)) = x
+
+    Foo : Nat
+      Foo = (Nat.Destroy
+        (Nat.Pow2
+          (Succ (Succ (Succ (Succ (Succ (Succ (Succ
+          (Succ (Succ (Succ (Succ (Succ (Succ (Succ
+          Zero))))))))))))))
+        )
+      )
+
+    (Bar n:U32) : U32
+      (Bar 0) = 0
+      (Bar 1) = 10
+      (Bar x) = 20
+
+    Main : U32
+      Main = (* (+ (Bar 1) 1) 2)
+  "
+
+  let file = (GetFile (File.Read code))
+  let func = (GetMaybe (File.NameToFunc file "Bool.Not"))
+  let term = (Rule.LHS (Func.GetRules func))
+  (Term.Compile file term)
