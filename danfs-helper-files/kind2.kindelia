@@ -1,0 +1,2133 @@
+// fixme: file is used non-linearly many time, fixing might optimize many functions
+// fixme: syntax error on `tf : (not (t == f))`
+// fixme: variables with same names are considered equal; add an unique id?
+// rewrites: 32177923 for `{(nat.destroy (nat.pow2 16)) == zero}`
+
+// #############################################################################
+// # prelude                                                                   #
+// #############################################################################
+
+
+
+// u32
+// ===
+
+// (u32.if u32 a a) : a
+(u32.if 0 t f) = f
+(u32.if 1 t f) = t
+
+// (u32.and u32 u32) : u32
+(u32.and 0 b) = 0
+(u32.and 1 b) = b
+
+// (u32.not u32) : u32
+(u32.not 0) = 1
+(u32.not 1) = 0
+
+
+
+// bool
+// ====
+
+// (if bool a a) : a
+(if false t f) = f
+(if true  t f) = t
+
+
+
+// pair
+// ====
+
+// (pair.get (pair a b) (∀a ∀b c)) : c
+(pair.get (pair x y) fn) = (fn x y)
+(pair.fst (pair x y)) = x
+(pair.snd (pair x y)) = y
+(pair.mutfst (pair x y) fn) = (pair (fn x) y)
+(pair.mutsnd (pair x y) fn) = (pair x (fn y))
+
+
+
+// trip
+// ====
+
+// (trip.get (trip a b c) (∀a ∀b λc d)) : d
+(trip.get (trip x y z) fn) = (fn x y z)
+
+
+
+// maybe
+// =====
+
+// (maybe.case (maybe a) p (∀a p)) : p
+(maybe.case (some x) case_none case_some) = (case_some x)
+(maybe.case none     case_none case_some) = case_none
+
+
+
+// list
+// ====
+
+// (list.map (list a) (∀a b)) : (list b)
+(list.map nil         f) = nil
+(list.map (cons x xs) f) = (cons (f x) (list.map xs f))
+
+// (list.reverse (list a)) : (list a)
+(list.reverse list) = (list.reverse.go list [])
+  (list.reverse.go nil         result) = result
+  (list.reverse.go (cons x xs) result) = (list.reverse.go xs (cons x result))
+
+// (list.length (list a)) : u32
+(list.length nil)         = 0
+(list.length (cons x xs)) = (+ 1 (list.length xs))
+
+// (list.isempty (list a)) : bool
+(list.isempty nil)         = 1
+(list.isempty (cons x xs)) = 0
+
+// concatenates two lists
+// (list.concat a:(list a) b:(list a)) : (list a)
+(list.concat nil         ys) = ys
+(list.concat (cons x xs) ys) = (cons x (list.concat xs ys))
+
+// (list.fold (list a) b (∀a ∀b (b))) : b
+(list.fold nil         nil cons) = nil
+(list.fold (cons x xs) nil cons) = (cons x (list.fold xs nil cons))
+
+
+
+// name
+// ====
+
+(name.make str) = (name str (string.hash str))
+
+(name.gethash (name str hash)) = hash
+
+(name.getstring (name str hash)) = str
+
+(name.equal (name a_str a_hash) (name b_str b_hash)) = (== a_hash b_hash)
+
+
+
+// string
+// ======
+
+// the new line string: "\n"
+// newline : string
+newline = (strcons 10 strnil)
+
+// returns true if a string is empty
+// (string.isempty string) : bool
+(string.isempty strnil)         = true
+(string.isempty (strcons x xs)) = false
+
+// concatenates two strings
+// (string.concat a:string b:string) : string
+(string.concat strnil         ys) = ys
+(string.concat (strcons x xs) ys) = (strcons x (string.concat xs ys))
+
+// concatenates a list of strings
+// (string.flatten a:(list string)) : string
+(string.flatten nil)         = strnil
+(string.flatten (cons x xs)) = (string.concat x (string.flatten xs))
+
+// returns true if two strings are equal
+// (string.equal (list string) (list string)) : u32
+(string.equal strnil         strnil)         = 1
+(string.equal (strcons x xs) (strcons y ys)) = (& (== x y) (string.equal xs ys))
+(string.equal xs             ys)             = 0
+
+// todo: improve this
+// (string.hash string) : string
+(string.hash str) = (string.hash.go str 0)
+  (string.hash.go strnil         hash) = hash
+  (string.hash.go (strcons x xs) hash) = (string.hash.go xs (+ (- (<< hash 5) hash) x))
+
+// (string.isempty string) : u32
+(string.isempty strnil) = 1
+(string.isempty (strcons x xs)) = 0
+
+// string.map
+(string.map strnil fn)         = strnil
+(string.map (strcons x xs) fn) = (strcons (fn x) (string.map xs fn))
+
+// string.join
+(string.join nil          sep) = ""
+(string.join (cons x nil) sep) = x
+(string.join (cons x xs)  sep) = (string.flatten [x sep (string.join xs sep)])
+
+
+
+// array
+// =====
+
+(array.empty) = (array 0 braun.tip)
+
+(array.push (array n t) v) = (array (+ n 1) (braun.push.go (+ n 1) (& (+ n 1) 1) t v))
+  (braun.push.go 1 o t v)                 = (braun.tie braun.tip v braun.tip)
+  (braun.push.go n 0 (braun.tie l x r) v) = (braun.tie (braun.push.go (>> n 1) (& (>> n 1) 1) l v) x r)
+  (braun.push.go n 1 (braun.tie l x r) v) = (braun.tie l x (braun.push.go (>> n 1) (& (>> n 1) 1) r v))
+  (braun.push n t v)                      = (braun.push.go n (& n 1) t v)
+
+(array.pop (array n t)) = (array (- n 1) (braun.pop.go n (& n 1) t))
+  (braun.pop.go 1 o t)                 = (braun.tip)
+  (braun.pop.go n 0 (braun.tie l x r)) = (braun.tie (braun.pop.go (>> n 1) (& (>> n 1) 1) l) x r)
+  (braun.pop.go n 1 (braun.tie l x r)) = (braun.tie l x (braun.pop.go (>> n 1) (& (>> n 1) 1) r))
+
+(array.mut (array size t) i f) = (array.mut.aux (< i size) i f size t)
+  (array.mut.aux 0 i f size t) = (array size t)
+  (array.mut.aux 1 i f size t) = (array size (braun.mut.go (+ i 1) f (& (+ i 1) 1) t))
+  (braun.mut.go 1 f o (braun.tie l x r)) = (braun.tie l (f x) r)
+  (braun.mut.go i f 0 (braun.tie l x r)) = (braun.tie (braun.mut.go (>> i 1) f (& (>> i 1) 1) l) x r)
+  (braun.mut.go i f 1 (braun.tie l x r)) = (braun.tie l x (braun.mut.go (>> i 1) f (& (>> i 1) 1) r))
+
+(array.set (array size t) i v) = (array.mut (array size t) i λx(v))
+
+(array.get (array size t) idx) = (array.get.aux (< idx size) idx t)
+  (array.get.aux 0 idx t) = (none)
+  (array.get.aux 1 idx t) = (some (braun.get.go (+ idx 1) (& (+ idx 1) 1) t))
+  (braun.get.go 1 o (braun.tie l x r))   = x
+  (braun.get.go idx 0 (braun.tie l x r)) = (braun.get.go (>> idx 1) (& (>> idx 1) 1) l)
+  (braun.get.go idx 1 (braun.tie l x r)) = (braun.get.go (>> idx 1) (& (>> idx 1) 1) r)
+
+(array.got (array size t) idx) = (array.got.aux (< idx size) idx size t)
+  (array.got.aux 0 idx size t) = (pair (array size t) (none))
+  (array.got.aux 1 idx size t) = ((braun.got.go (+ idx 1) (& (+ idx 1) 1) t) λt λv (pair (array size t) (some v)))
+  (braun.got.go 1 o (braun.tie l x r)) = λt (t (braun.tie l x r) x)
+  (braun.got.go i 0 (braun.tie l x r)) = ((braun.got.go (>> i 1) (& (>> i 1) 1) l) λl λv λt (t (braun.tie l x r) v))
+  (braun.got.go i 1 (braun.tie l x r)) = ((braun.got.go (>> i 1) (& (>> i 1) 1) r) λr λv λt (t (braun.tie l x r) v))
+
+(array.size (array size tree)) = (pair (array size tree) size)
+
+// (array.range u32) : array<u32>
+(array.range 0) = array.empty
+(array.range n) = (array.push (array.range (- n 1)) (- n 1))
+
+// (array.tolist (array a)) : (list a)
+(array.tolist (array size tree)) = ((braun.tolist.go tree) nil)
+  (braun.tolist.go (braun.tie l x r)) = λz((braun.tolist.go l) (cons x ((braun.tolist.go r) z)))
+  (braun.tolist.go braun.tip)         = λz(z)
+
+
+
+// map
+// ===
+
+//type u32map <a: type> {
+  //empty
+  //value(val: a),
+  //branch(lft: u32map<a>, rgt: u32map<a>),
+//}
+
+(len empty)           = 0
+(len (entry val))     = 1
+(len (nodes lft rgt)) = (+ (len lft) (len rgt))
+
+// (get (tree a) u32) : (pair tree (maybe a))
+(get tree key) = (get.go 32 tree key (λx x))
+  (get.go n empty            key self)  = (pair (self empty) none)
+  (get.go n (entry val)      key self)  = (pair (self (entry val)) (some val))
+  (get.go n (nodes lft rgt)  key self)  = (get.go.nodes (& (>> key (- n 1)) 1) (- n 1) key lft rgt self)
+    (get.go.nodes 0 n key lft rgt self) = (get.go n lft key λx(self (nodes x rgt)))
+    (get.go.nodes 1 n key lft rgt self) = (get.go n rgt key λx(self (nodes lft x)))
+
+(del tree key) = (del.go 32 tree key)
+  (del.go n (nodes lft rgt) key)  = (del.go.nodes (& (>> key (- n 1)) 1) (- n 1) lft rgt key)
+    (del.go.nodes 0 n lft rgt key) = (nodes (del.go n lft key) rgt)
+    (del.go.nodes 1 n lft rgt key) = (nodes lft (del.go n rgt key))
+  (del.go n tree key)             = empty
+
+(set tree key val) = (set.go 32 tree key val)
+  (set.go 0 tree             key val)  = (entry val)
+  (set.go n empty            key val)  = (set.go.empty (& (>> key (- n 1)) 1) (- n 1) key val)
+    (set.go.empty 0 n key         val) = (nodes (set.go n empty key val) empty)
+    (set.go.empty 1 n key         val) = (nodes empty (set.go n empty key val))
+  (set.go n (nodes lft rgt)  key val)  = (set.go.nodes (& (>> key (- n 1)) 1) (- n 1) key lft rgt val)
+    (set.go.nodes 0 n key lft rgt val) = (nodes (set.go n lft key val) rgt)
+    (set.go.nodes 1 n key lft rgt val) = (nodes lft (set.go n rgt key val))
+
+(mut tree key fun) = (mut.go 32 tree key fun)
+  (mut.go 0 (entry x)        key fun)  = (entry (fun x))
+  (mut.go 0 tree             key fun)  = tree
+  (mut.go n empty            key fun)  = (mut.go.empty (& (>> key (- n 1)) 1) (- n 1) key fun)
+    (mut.go.empty 0 n key         fun) = (nodes (mut.go n empty key fun) empty)
+    (mut.go.empty 1 n key         fun) = (nodes empty (mut.go n empty key fun))
+  (mut.go n (nodes lft rgt)  key fun)  = (mut.go.nodes (& (>> key (- n 1)) 1) (- n 1) key lft rgt fun)
+    (mut.go.nodes 0 n key lft rgt fun) = (nodes (mut.go n lft key fun) rgt)
+    (mut.go.nodes 1 n key lft rgt fun) = (nodes lft (mut.go n rgt key fun))
+
+(list.tomap list) = (list.tomap.go list empty)
+  (list.tomap.go (cons (pair key val) xs) map) = (list.tomap.go xs (set map key val))
+  (list.tomap.go nil                      map) = map
+
+(map.tolist val) = ((map.tolist.go val 0) nil)
+  (map.tolist.go empty           key) = λx x
+  (map.tolist.go (entry val)     key) = λx (cons (pair key val) x)
+  (map.tolist.go (nodes lft rgt) key) = λx ((map.tolist.go lft (* key 2)) ((map.tolist.go rgt (+ (* key 2) 1)) x))
+
+
+
+// #############################################################################
+// # parser combinators                                                        #
+// #############################################################################
+
+
+
+// parser
+// ======
+
+// code : type
+// code = string
+
+// answer : type -> type
+// answer a = parsed code a | failed string
+
+// parser : type -> type
+// parser a = code -> answer a
+
+// (isnamechar char) : u32
+(isnamechar chr) =
+  let is_letter = (| (& (<= 'a' chr) (<= chr 'z')) (& (<= 'a' chr) (<= chr 'z')))
+  let is_number = (& (<= '0' chr) (<= chr '9'))
+  let is_symbol = (| (== '_' chr) (== '.' chr))
+  (| is_letter (| is_number is_symbol))
+
+// (isupper char) : u32
+(isupper chr) =
+  (& (<= 'a' chr) (<= chr 'z'))
+
+// (islower char) : u32
+(islower chr) =
+  (& (<= 'a' chr) (<= chr 'z'))
+
+// (isnumeric char) : u32
+(isnumeric chr) =
+  (& (<= '0' chr) (<= chr '9'))
+
+// (isoperator char) : u32
+(isoperator chr) =
+  (| (== '+' chr)
+  (| (== '-' chr)
+  (| (== '*' chr)
+  (| (== '/' chr)
+  (| (== '%' chr)
+  (| (== '&' chr)
+  (| (== '|' chr)
+  (| (== '^' chr)
+  (| (== '<' chr)
+  (| (== '>' chr)
+  (| (== '=' chr)
+  (| (== '!' chr)
+     0))))))))))))
+
+// (bind a_parser:(parser a) b_parser:(∀a (parser b))) : (parser b)
+(bind a_parser b_parser) = λcode (bind.go b_parser (a_parser code))
+  (bind.go b_parser (parsed code a_val)) = (b_parser a_val code)
+  (bind.go b_parser (failed err))        = (failed err)
+
+// (done val:a) : (parser a)
+(done value) = λcode (parsed code value)
+
+// (isspace char) : u32
+(isspace chr) = (| (== 10 chr) (== ' ' chr))
+
+// (getname string) : (pair code:string name:string)
+(getname) = λcode (getname.go code)
+  (getname.go strnil)                 = (pair strnil strnil)
+  (getname.go (strcons head tail))    = (getname_1 (isnamechar head) head tail)
+    (getname_1 0 head tail)           = (pair (strcons head tail) strnil)
+    (getname_1 1 head tail)           = (getname_2 head (getname.go tail))
+    (getname_2 head (pair code name)) = (pair code (strcons head name))
+
+// (matcher text:string) : (parser bool)
+(matcher consume text) = λcode (matcher.go text code consume λx(x))
+  (matcher.go nil         ys             consume redo) = (parsed ((if consume λx(x) redo) ys) true)
+  (matcher.go (cons x xs) strnil         consume redo) = (parsed (redo strnil) false)
+  (matcher.go (cons x xs) (strcons y ys) consume redo) = (matchertest (x y) xs y ys consume redo)
+    (matchertest 0 xs y ys consume redo) = (parsed (redo (strcons y ys)) false)
+    (matchertest 1 xs y ys consume redo) = (matcher.go xs ys consume λk(redo (strcons y k)))
+
+// (textcomparer string) : (∀char bool)
+(textcomparer strnil)         = nil
+(textcomparer (strcons x xs)) = (cons λc(== x c) (textcomparer xs))
+
+// (peekcondshere conds:(∀char bool)) : (parser bool)
+(peekcondshere conds) = λcode ((matcher false conds) code)
+
+//// (peekconds conds:(∀char bool)) : (parser bool)
+(peekconds conds) = λcode ((matcher false conds) (skipper code))
+
+// (peektexthere text:string) : (parser bool)
+(peektexthere text) = λcode ((matcher false (textcomparer text)) code)
+
+// (peektext text:string) : (parser bool)
+(peektext text) = λcode ((matcher false (textcomparer text)) (skipper code))
+
+// (matchcondshere conds:(∀char bool)) : (parser bool)
+(matchcondshere conds) = λcode ((matcher true conds) code)
+
+// (matchconds conds:(∀char bool)) : (parser bool)
+(matchconds conds) = λcode ((matcher true conds) (skipper code))
+
+// (matchtexthere text:string) : (parser bool)
+(matchtexthere text) = λcode ((matcher true (textcomparer text)) code)
+
+// (matchtext text:string) : (parser bool)
+(matchtext text) = λcode ((matcher true (textcomparer text)) (skipper code))
+
+// (testchar cond:(∀char bool)) : (parser bool)
+(testchar cond) = λcode ((testcharhere cond) (skipper code))
+
+// (parsetexthere text:string) : (parser unit)
+(parsetexthere text)      = (bind (matchtexthere text) λgot(parsetextheregot got))
+  (parsetextheregot false) = λcode (failed "syntax error.") // todo: show expected
+  (parsetextheregot true)  = (done unit)
+
+// (parsetext text:string) : (parser unit)
+(parsetext text) = λcode ((parsetexthere text) (skipper code))
+
+// skips spaces and comments
+// (skipper string) : string
+(skipper strnil)         = strnil
+(skipper (strcons x xs)) = (skipper.go (isspace x) (== x '/') x xs)
+
+  (skipper.go 0 0 x xs)   = (strcons x xs)
+  (skipper.go 1 c x xs)   = (skipper xs)
+  (skipper.go s 1 x xs)   = (skipper.dropcomment xs)
+
+  (skipper.dropcomment strnil)         = strnil
+  (skipper.dropcomment (strcons x xs)) = (skipper.dropcomment.go (== x 10) x xs) 
+    
+    (skipper.dropcomment.go 1 x xs) = (skipper xs)
+    (skipper.dropcomment.go 0 x xs) = (skipper.dropcomment xs)
+
+// (parsenamehere) : (parser string)
+parsenamehere                        = λcode (parsenamehere_0 ((getname) code))
+  (parsenamehere_0 (pair code name)) = (parsed code name)
+
+// (parsename) : (parser string)
+parsename = λcode ((parsenamehere) (skipper code))
+
+// (parseend) : (parser bool)
+parseend = λcode (parseend.go code)
+  (parseend.go strnil)         = (parsed nil true)
+  (parseend.go (strcons x xs)) = (parsed (strcons x xs) false)
+
+// parses until a stop condition is true.
+// (parseuntil parser:(parser a) stop:(parser bool)) : (parser (list a))
+(parseuntil stop parser) = (bind stop λs (parseuntil.go s stop parser))
+  (parseuntil.go false stop parser) =
+    (bind parser                   λhead 
+    (bind (parseuntil stop parser) λtail 
+    (done (cons head tail))))
+  (parseuntil.go true stop parser) =
+    (done nil)
+
+// (grammar choices:(list (parser (maybe a)))) : (parser a)
+(grammar nil)                                     = λcode (failed "<todo>")
+(grammar (cons choice choices))                   = λcode (grammar_0 (choice code) choices)
+  (grammar_0 (failed err)                choices) = (failed err)
+  (grammar_0 (parsed code none)          choices) = ((grammar choices) code)
+  (grammar_0 (parsed code (some result)) choices) = (parsed code result)
+
+// note: unlike rust's version, this won't rollback
+// (guard head:(parser bool) body:(parser a)) : (parser (maybe a))
+(guard head body) = λcode (guard_0 (head code) body)
+  (guard_0 (failed err)          body) = (failed err)
+  (guard_0 (parsed code false)   body) = (parsed code none)
+  (guard_0 (parsed code true)    body) = ((bind body λgot(done (some got))) code)
+
+
+
+// #############################################################################
+// # kind2                                                                     #
+// #############################################################################
+
+
+
+// parsing
+// -------
+
+// (parsevar) : (parser (maybe term))
+(parsevar) = (bind parsename λname (parsevar.0 name))
+
+  (parsevar.0 strnil)         = (done none)
+  (parsevar.0 (strcons x xs)) = (parsevar.1
+    (string.equal (strcons x xs) "type")
+    (string.equal (strcons x xs) "u32")
+    (isupper x)
+    (isnumeric x)
+    (strcons x xs))
+
+  (parsevar.1 1 _ _ _ str) = (done (some typ))
+  (parsevar.1 _ 1 _ _ str) = (done (some u32))
+  (parsevar.1 _ _ 1 _ str) = (done (some (cts str [])))
+  (parsevar.1 _ _ _ 1 str) = (done (some (n32 (u32.read str))))
+  (parsevar.1 _ _ _ _ str) = (bind (matchtext ":") λis_ann (parsevar.2 (if is_ann 1 _) str))
+
+  (parsevar.2 1 str) = (bind parseterm λterm (done (some (ann (var (name.make str)) term))))
+  (parsevar.2 0 str) = (done (some (var (name.make str))))
+
+// (parseask) : (parse (maybe term))
+(parseask) = (guard (matchtext "?")
+  (bind parsename λname
+  (done (ask name))))
+
+// (parsedef) : (parser (maybe term))
+(parsedef) = (guard (matchtext "def ")
+  (bind parsename       λname
+  (bind (matchtext ":") λanns
+  (parsedefann anns name))))
+(parsedefann true name) =
+  (bind parseterm       λtype
+  (bind (parsetext "=") λskip
+  (bind parseterm       λexpr
+  (bind parseterm       λbody
+  (done (def (name.make name) (ann expr type) body))))))
+(parsedefann false name) =
+  (bind (parsetext "=") λskip
+  (bind parseterm       λexpr
+  (bind parseterm       λbody
+  (done (def (name.make name) expr body)))))
+
+// (parselet) : (parser (maybe term))
+(parselet) = (guard (matchtext "let ")
+  (bind parsename       λname
+  (bind (matchtext ":") λanns
+  (parseletann anns name))))
+(parseletann true name) =
+  (bind parseterm       λtype
+  (bind (parsetext "=") λskip
+  (bind parseterm       λexpr
+  (bind parseterm       λbody
+  (done (let (name.make name) (ann expr type) body))))))
+(parseletann false name) =
+  (bind (parsetext "=") λskip
+  (bind parseterm       λexpr
+  (bind parseterm       λbody
+  (done (let (name.make name) expr body)))))
+
+// (parseall) : (parse (maybe term))
+(parseall) = (guard (matchtext "∀")
+  (bind (parsetext "(")  λskip
+  (bind parsename        λname
+  (bind (parsetext ":")  λskip
+  (bind parseterm        λtype
+  (bind (parsetext ")")  λskip
+  (bind parseterm        λbody
+  (done (all (name.make name) type body)))))))))
+
+// (parselam) : (parser (maybe term))
+(parselam) = (guard (matchtext "λ")
+  (bind parsename λname
+  (bind parseterm λbody
+  (done (lam (name.make name) body)))))
+
+// (parseapp) : (parser (maybe term)) 
+(parseapp) = (guard (matchtext "(")
+  (bind parseterm                              λfunc
+  (bind (parseuntil (matchtext ")") parseterm) λargs
+  (done ((list.fold args λx(x) λxλtλf(t (app f x))) func)))))
+
+// (parsects) : (parser (maybe term)) 
+(parsects) = (guard (peekconds [λx(== x '(') λx(isupper x)])
+  (bind (parsetext "(")                        λskip
+  (bind parsename                              λname
+  (bind (parseuntil (matchtext ")") parseterm) λargs
+  (done (cts name args))))))
+
+// (parseo32) : (parser (maybe term)) 
+(parseo32) = (guard (peekconds [λx(== x '(') λx(isoperator x)])
+  (bind (parsetext "(") λskip
+  (bind parseoper λoper
+  (bind parseterm λval0
+  (bind parseterm λval1
+  (bind (parsetext ")") λskip
+  (done (o32 oper val0 val1))))))))
+
+(parseoper) = (grammar [
+  (guard (matchtext "+")  (done add))
+  (guard (matchtext "-")  (done sub))
+  (guard (matchtext "*")  (done mul))
+  (guard (matchtext "/")  (done div))
+  (guard (matchtext "%")  (done mod))
+  (guard (matchtext "&")  (done and))
+  (guard (matchtext "|")  (done or))
+  (guard (matchtext "^")  (done xor))
+  (guard (matchtext "<<") (done shl))
+  (guard (matchtext ">>") (done shr))
+  (guard (matchtext "<")  (done ltn))
+  (guard (matchtext "<=") (done lte))
+  (guard (matchtext "==") (done eql))
+  (guard (matchtext ">=") (done gte))
+  (guard (matchtext ">")  (done gtn))
+  (guard (matchtext "!=") (done neq))
+  (done (some add)) // fixme?
+])
+
+//rewrite x with e in goal
+// (parserwt) : (parser (maybe term))
+(parserwt) = (guard (matchtext "rewrite ")
+  (bind parsename          λname
+  (bind (parsetext "with") λskip
+  (bind parseterm          λwitn
+  (bind (parsetext "in")   λskip
+  (bind parseterm          λgoal
+  (bind parseterm          λexpr
+  (done (rwt (name.make name) witn goal expr)))))))))
+
+// (parseanneql) : (parser (maybe term))
+(parseanneql) = (guard (matchtext "{")
+  (bind parseterm        λval0
+  (bind (matchtext "::") λanns
+  (parseanneqlgo anns val0))))
+(parseanneqlgo true val0) =
+  (bind parseterm       λval1
+  (bind (parsetext "}") λskip
+  (done (ann val0 val1))))
+(parseanneqlgo false val0) =
+  (bind (parsetext "==") λskip
+  (bind parseterm        λval1
+  (bind (parsetext "}")  λskip
+  (done (eql val0 val1)))))
+
+// (parserfl) : (parser (maybe term))
+(parserfl) = (guard (matchtext "refl ")
+  (bind parseterm λexpr
+  (done (rfl expr))))
+
+// (parsemet) : (parser (maybe term))
+(parsemet) = (guard (matchtext "_")
+  (done met))
+
+// (parseterm) : (parser term)
+(parseterm) =
+
+  (bind parseterm.ini λini
+  (bind parseterm.end λend
+  (done (end ini))))
+
+  (parseterm.ini) = (grammar [
+    parsedef,
+    parselet,
+    parsects,
+    parseo32,
+    parseall,
+    parselam,
+    parseapp,
+    parseask,
+    parserfl,
+    parserwt,
+    parseanneql,
+    parsemet,
+    parsevar,
+  ])
+
+  (parseterm.end) = (grammar [
+    //(parseann)
+    //(parseeql)
+    (done (some λx(x)))
+  ])
+
+// (parsedecl) : (parser decl)
+(parsedecl) =
+  (bind parseterm       λlhs
+  (bind (matchtext ":") λtyp
+  (parsedecl_rhs typ lhs)))
+(parsedecl_rhs true lhs) = 
+  (bind parseterm λrhs
+  (done (deftype lhs rhs)))
+(parsedecl_rhs false lhs) =
+  (bind (parsetext "=") λskp
+  (bind parseterm       λrhs
+  (done (defrule lhs rhs))))
+
+// (parsedecls) : (parser (list decl))
+(parsedecls) = (parseuntil
+  λcode((parseend) (skipper code))
+  parsedecl)
+
+// (term.read file string) : term
+(term.read file code) = ((finalize (term.read.got ((parseterm) code)) (file.getnametable file) 0) λntab λmets λterm term)
+  (term.read.got (parsed code term)) = term
+  (term.read.got (failed err))       = (var (string.concat "[parseerror] " err))
+
+// (file.read string) : (result file)
+(file.read code) = (file.read.got ((parsedecls) code))
+  (file.read.got (parsed code decls)) = (ok (file.make decls))
+  (file.read.got (failed err))        = (er (string.concat "[parseerror] " err))
+
+
+
+// name table
+// ----------
+
+//type nametable {
+  //n2i: (u32map u32)
+  //i2n: (array string)
+//}
+
+// (nametable.empty) : nametable
+nametable.empty = (nametable empty array.empty)
+
+// (nametable.nametoid nametable string) : (maybe u32)
+(nametable.nametoid (nametable n2i i2n) name) = (pair.get (get n2i (string.hash name)) λn2iλgot(got))
+
+// (nametable.idtoname nametable u32) : (maybe string)
+(nametable.idtoname (nametable n2i i2n) id) = (pair.get (array.got i2n id) λi2nλgot(got))
+
+// finalizes the parsing of a term.
+// - converts every ctr name into a sequential id.
+// (finalize nametable term u32) : (tuple2 nametable term)
+(finalize (var name) ntab mets) =
+  λt (t ntab mets (var name))
+(finalize met ntab mets) =
+  λt (t ntab (+ mets 1) (met mets))
+(finalize typ ntab mets) =
+  λt (t ntab mets typ)
+(finalize u32 ntab mets) =
+  λt (t ntab mets u32)
+(finalize (n32 numb) ntab mets) =
+  λt (t ntab mets (n32 numb))
+(finalize (o32 oper val0 val1) ntab mets) =
+  ((finalize val0 ntab mets) λntab λmets λval0
+  ((finalize val1 ntab mets) λntab λmets λval1
+  λt (t ntab mets (o32 oper val0 val1))))
+(finalize (ask name) ntab mets) =
+  λt (t ntab mets (ask name))
+(finalize (ann xval xtyp) ntab mets) =
+  ((finalize xval ntab mets) λntab λmets λxval
+  ((finalize xtyp ntab mets) λntab λmets λxtyp
+  λt (t ntab mets (ann xval xtyp))))
+(finalize (def name expr body) ntab mets) =
+  ((finalize expr ntab mets) λntab λmets λexpr
+  ((finalize body ntab mets) λntab λmets λbody
+  λt (t ntab mets (finalize.def name expr body))))
+(finalize (let name expr body) ntab mets) =
+  ((finalize expr ntab mets) λntab λmets λexpr
+  ((finalize body ntab mets) λntab λmets λbody
+  λt (t ntab mets (let name expr body))))
+(finalize (all name type body) ntab mets) =
+  ((finalize type ntab mets) λntab λmets λtype
+  ((finalize body ntab mets) λntab λmets λbody
+  λt (t ntab mets (all name type body))))
+(finalize (lam name body) ntab mets) =
+  ((finalize body ntab mets) λntab λmets λbody
+  λt (t ntab mets (lam name body)))
+(finalize (app func argm) ntab mets) =
+  ((finalize func ntab mets) λntab λmets λfunc
+  ((finalize argm ntab mets) λntab λmets λargm
+  λt (t ntab mets (app func argm))))
+(finalize (eql val0 val1) ntab mets) =
+  ((finalize val0 ntab mets) λntab λmets λval0
+  ((finalize val1 ntab mets) λntab λmets λval1
+  λt (t ntab mets (eql val0 val1))))
+(finalize (rfl expr) ntab mets) =
+  ((finalize expr ntab mets) λntab λmets λexpr
+  λt (t ntab mets (rfl expr)))
+(finalize (rwt name witn goal expr) ntab mets) =
+  ((finalize witn ntab mets) λntab λmets λwitn
+  ((finalize goal ntab mets) λntab λmets λgoal
+  ((finalize expr ntab mets) λntab λmets λexpr
+  λt (t ntab mets (rwt name witn goal expr)))))
+(finalize (cts name args) (nametable n2i i2n) mets) =
+  let hash = (string.hash name)
+  (pair.get (get n2i hash) λn2i λgot
+  (finalize.cts got name hash args (nametable n2i i2n) mets))
+
+(finalize.cts none name hash args (nametable n2i (array size tree)) mets) =
+  let ctid = size
+  let ntab = (nametable (set n2i hash size) (array.push (array size tree) name))
+  ((finalize.many args ntab mets) λntab λmets λargs
+  λt (t ntab mets (cts ctid args)))
+(finalize.cts (some ctid) name hash args ntab mets) =
+  ((finalize.many args ntab mets) λntab λmets λargs
+  λt (t ntab mets (cts ctid args)))
+
+(finalize.many nil ntab mets) =
+  λt (t ntab mets nil)
+(finalize.many (cons head tail) ntab mets) =
+  ((finalize      head ntab mets) λntab λmets λhead
+  ((finalize.many tail ntab mets) λntab λmets λtail
+  λt (t ntab mets (cons head tail))))
+
+// used for parse-time subst (def), not by the evaluator/checker!
+// (finalize.def string term term) : term
+(finalize.def nm val (var name))                = (u32.if (name.equal name nm) val (var name))
+(finalize.def nm val (met hash))                = (met hash)
+(finalize.def nm val typ)                       = typ
+(finalize.def nm val u32)                       = u32
+(finalize.def nm val (n32 numb))                = (n32 numb)
+(finalize.def nm val (o32 oper val0 val1))      = (o32 oper (finalize.def nm val val0) (finalize.def nm val val1))
+(finalize.def nm val (ask name))                = (ask name)
+(finalize.def nm val (ann xval xtyp))           = (ann (finalize.def nm val xval) (finalize.def nm val xtyp))
+(finalize.def nm val (let name expr body))      = (let name (finalize.def nm val expr) (finalize.def.body nm val name body))
+(finalize.def nm val (all name type body))      = (all name (finalize.def nm val type) (finalize.def.body nm val name body))
+(finalize.def nm val (lam name body))           = (lam name (finalize.def.body nm val name body))
+(finalize.def nm val (app func argm))           = (app (finalize.def nm val func) (finalize.def nm val argm))
+(finalize.def nm val (cts ctid args))           = (cts ctid (finalize.def.many nm val args))
+
+(finalize.def nm val (eql val0 val1))           = (eql (finalize.def nm val val0) (finalize.def nm val val1))
+(finalize.def nm val (rfl expr))                = (rfl (finalize.def nm val expr))
+(finalize.def nm val (rwt name witn goal expr)) = (rwt name (finalize.def nm val witn) (finalize.def.body nm val name goal) (finalize.def nm val expr))
+
+(finalize.def.many nm val nil)         = nil
+(finalize.def.many nm val (cons x xs)) = (cons (finalize.def nm val x) (finalize.def.many nm val xs))
+
+// (finalize.def.body string term string term) : term
+(finalize.def.body nm val name body) = (finalize.def.body.go (name.equal nm name) nm val body)
+  (finalize.def.body.go 0 nm val body) = (finalize.def nm val body)
+  (finalize.def.body.go 1 nm val body) = body
+
+// (ctr.getid term) : u32
+(ctr.getid (cts ctid args)) = ctid
+(ctr.getid term)            = 0
+
+(var.getname (var name)) = name
+(var.getname x)          = (name.make "_")
+
+(arg.get (ann var expr) cont) = (cont (var.getname var) expr)
+(arg.get term           cont) = (cont (name.make "_") term)
+
+
+
+// file
+// ----
+
+// type decl {
+//   deftype(lhs:term, rhs:term)
+//   defrule(lhs:lhs, rhs:term)
+// }
+
+// type type {
+//   lhs: term
+//   rhs: term
+// }
+
+// type rule {
+//   lhs: term
+//   rhs: term
+// }
+
+// type func {
+//   type: (pair term term)
+//   rules: list<rule>
+// }
+
+// type file {
+//   ntab: nametable
+//   funs: array func
+// }
+
+// funcempty : func
+funcempty = (func (var (name.make "?")) (var (name.make "?")) end)
+
+// (funcsettype func:func new_type:type) : func
+(funcsettype (func lty rty rules) new_lty new_rty) = (func new_lty new_rty rules)
+
+// (funcsettype func:func lhs:term rhs:term) : func
+(funcaddrule (func lty rty rules) lhs rhs) = (func lty rty (rule lhs rhs rules))
+
+// (func.getname func:func file:file) : func
+(func.getname (func lty rty rules) file) = (maybe.case (file.idtoname file (ctr.getid lty)) "?" λx(x))
+
+// (func.get func:func ...) : ...
+(func.get (func lty rty rules) cont) = (cont lty rty rules)
+
+// (func.getrules func:func ...) : ...
+(func.getrules (func lty rty rules)) = rules
+
+// (file.make nametable (list decl)) : file
+(file.make decls) = ((file.make.go nametable.empty decls) λntab λfuns (file ntab funs))
+
+  // (file.make.funcs u32) : file
+  (file.make.funcs 0) = array.empty
+  (file.make.funcs n) = (array.push (file.make.funcs (- n 1)) funcempty)
+
+  (file.make.go (nametable n2i (array i2n.size i2n.tree)) nil) = 
+    λt (t (nametable n2i (array i2n.size i2n.tree)) (file.make.funcs i2n.size))
+
+  (file.make.go (nametable n2i i2n) (cons (deftype lhs rhs) decls)) =
+    let ntab = (nametable n2i i2n)
+    ((finalize lhs ntab 0)     λntab λmets λlhs
+    ((finalize rhs ntab 0)     λntab λmets λrhs
+    ((file.make.go ntab decls) λntab λfuns
+    let ctid = (ctr.getid lhs)
+    let func = λfunc (funcsettype func lhs rhs)
+    λt (t ntab (array.mut funs ctid func)))))
+
+  (file.make.go (nametable n2i i2n) (cons (defrule lhs rhs) decls)) =
+    let ntab = (nametable n2i i2n)
+    ((finalize lhs ntab 0)     λntab λmets λlhs
+    ((finalize rhs ntab 0)     λntab λmets λrhs
+    ((file.make.go ntab decls) λntab λfuns
+    let ctid = (ctr.getid lhs)
+    let func = λfunc (funcaddrule func (file.make.lhs lhs rhs) rhs)
+    λt (t ntab (array.mut funs ctid func)))))
+
+  // builds the left-hand side of a rule, annotating variable usage counts.
+  // todo: use different constructor names
+  // fixme: is this really needed? benchmark without
+  // (file.make.lhs term term) : term
+  (file.make.lhs (var name)      rhs) = (use name (uses name rhs))
+  (file.make.lhs (cts ctid args) rhs) = (cts ctid (file.make.lhs.many args rhs))
+  (file.make.lhs (n32 numb)      rhs) = (n32 numb)
+
+  (file.make.lhs.many nil         rhs) = nil
+  (file.make.lhs.many (cons x xs) rhs) = (cons (file.make.lhs x rhs) (file.make.lhs.many xs rhs))
+
+
+// (file.getnametable file) : nametable
+(file.getnametable (file ntab funs)) = ntab
+
+// (file.getfuncs file) : (array func)
+(file.getfuncs (file ntab funs)) = funs
+
+// (file.getfunc file u32) : (pair file (maybe func))
+(file.gotfunc (file ntab funs) ctid) =
+  (pair.get (array.got funs ctid) λfuns λgot
+  (pair (file ntab funs) got))
+
+// (file.nametoid file string) : (maybe u32)
+(file.nametoid (file ntab funs) name) = (nametable.nametoid ntab name)
+
+// (file.idtoname file u32) : (maybe string)
+(file.idtoname (file ntab funs) id) = (nametable.idtoname ntab id)
+
+// (file.isctr file u32) : bool
+(file.isctr (file ntab funs) ctid) =
+  (pair.get (array.got funs ctid) λfuns λgot
+  (maybe.case got 1 λfunc(file.isctr.func func)))
+
+  (file.isctr.func (func lty rty end))                  = 1
+  (file.isctr.func (func lty rty (rule lhs rhs rules))) = 0
+
+// stringifying
+// ------------
+
+// (term.show term:term file:file) : string
+(term.show file term) = ((term.show.go term file) "")
+  (term.show.go (var name) file) =
+    λx((string.show.go (name.getstring name))
+      x)
+  (term.show.go (use name uses) file) =
+    λx((string.show.go "$")
+      ((string.show.go (name.getstring name))
+      x))
+  (term.show.go (met hash) file) =
+    λx((string.show.go "_")
+      ((string.show.go (u32.show hash))
+      x))
+  (term.show.go (let name expr body) file) =
+    λx((string.show.go "let ")
+      ((string.show.go (name.getstring name))
+      ((string.show.go " = ")
+      ((term.show.go expr file)
+      ((string.show.go "; ")
+      ((term.show.go body file)
+      x))))))
+  (term.show.go (ann xval xtyp) file) =
+    λx((string.show.go "(")
+      ((term.show.go xval file)
+      ((string.show.go " :: ")
+      ((term.show.go xtyp file)
+      ((string.show.go ")")
+      x)))))
+  (term.show.go typ file) =
+    λx((string.show.go "type")
+      x)
+  (term.show.go u32 file) =
+    λx((string.show.go "u32")
+      x)
+  (term.show.go (n32 numb) file) =
+    λx((string.show.go (u32.show numb))
+      x)
+  (term.show.go (o32 oper val0 val1) file) =
+    λx((string.show.go "(")
+      ((oper.show.go oper)
+      ((string.show.go " ")
+      ((term.show.go val0 file)
+      ((string.show.go " ")
+      ((term.show.go val1 file)
+      ((string.show.go ")")
+      x)))))))
+  (term.show.go (ask name) file) =
+    λx((string.show.go "?")
+      ((string.show.go name)
+      x))
+  (term.show.go (all name type body) file) =
+    λx((string.show.go "∀(")
+      ((string.show.go (name.getstring name))
+      ((string.show.go ": ")
+      ((term.show.go type file)
+      ((string.show.go ") ")
+      ((term.show.go body file)
+      x))))))
+  (term.show.go (lam name body) file) =
+    λx((string.show.go "λ")
+      ((string.show.go (name.getstring name))
+      ((string.show.go " ")
+      ((term.show.go body file)
+      x))))
+  (term.show.go (app func argm) file) =
+    λx((string.show.go "(")
+      ((term.show.go func file)
+      ((string.show.go " ")
+      ((term.show.go argm file)
+      ((string.show.go ")")
+      x)))))
+  (term.show.go (cts ctid args) file) =
+    λx((string.show.go "(")
+      ((term.show.go.ctrname ctid file)
+      ((term.show.go.cts.args args file)
+      ((string.show.go ")")
+      x))))
+  (term.show.go (eql val0 val1) file) =
+    λx((term.show.go val0 file)
+      ((string.show.go " == ")
+      ((term.show.go val1 file)
+      x)))
+  (term.show.go (rfl expr) file) =
+    λx((string.show.go "refl ")
+      ((term.show.go expr file)
+      x))
+  (term.show.go (rwt name witn goal expr) file) =
+    λx((string.show.go "rewrite ")
+      ((string.show.go (name.getstring name))
+      ((string.show.go "with ")
+      ((term.show.go witn file)
+      ((string.show.go "in ")
+      ((term.show.go goal file)
+      ((string.show.go " ")
+      ((term.show.go expr file)
+      x))))))))
+  (term.show.go.ctrname id file) =
+    (maybe.case (file.idtoname file id)
+      (string.show.go (u32.show id))
+      λname (string.show.go name))
+  (term.show.go.cts.args nil file) =
+    λx(x)
+  (term.show.go.cts.args (cons arg args) file) =
+    λx((string.show.go " ")
+      ((term.show.go arg file)
+      ((term.show.go.cts.args args file)
+      x)))
+  (string.show.go xs) =
+    λx(string.concat xs x)
+  (oper.show.go add) = (string.show.go "+")
+  (oper.show.go sub) = (string.show.go "-")
+  (oper.show.go mul) = (string.show.go "*")
+  (oper.show.go div) = (string.show.go "/")
+  (oper.show.go mod) = (string.show.go "%")
+  (oper.show.go and) = (string.show.go "&")
+  (oper.show.go or)  = (string.show.go "|")
+  (oper.show.go xor) = (string.show.go "^")
+  (oper.show.go shl) = (string.show.go "<<")
+  (oper.show.go shr) = (string.show.go ">>")
+  (oper.show.go ltn) = (string.show.go "<")
+  (oper.show.go lte) = (string.show.go "<=")
+  (oper.show.go eql) = (string.show.go "==")
+  (oper.show.go gte) = (string.show.go ">=")
+  (oper.show.go gtn) = (string.show.go ">")
+  (oper.show.go neq) = (string.show.go "!=")
+
+(context.show nil file) = ""
+(context.show ctx file) =
+  let ctx = (list.reverse ctx)
+  let build = λz
+    ((string.show.go "context:")
+    ((string.show.go newline)
+    ((context.show.go ctx file)
+      z)))
+  (build "")
+
+  (context.show.go nil file) = λz(z)
+  (context.show.go (cons (pair name type) rest) file) =
+    λz((string.show.go "- ")
+      ((string.show.go (name.getstring name))
+      ((string.show.go " : ") 
+      ((term.show.go type file)
+      ((string.show.go newline)
+      ((context.show.go rest file)
+      z))))))
+
+(file.show file) = ((file.show.go (array.tolist (file.getfuncs file)) file) "")
+  (file.show.go nil file) =
+    λz(z)
+  (file.show.go (cons (func lhs.t lhs.r rules) funs) file) =
+    λz((term.show.go lhs.t file)
+      ((string.show.go " : ")
+      ((term.show.go lhs.r file)
+      ((string.show.go newline)
+      ((rules.show.go rules file)
+      ((string.show.go newline)
+      ((file.show.go funs file)
+      z)))))))
+  (rules.show.go end file) =
+    λx(x)
+  (rules.show.go (rule lhs rhs rules) file) =
+    λx((term.show.go lhs file)
+      ((string.show.go " = ")
+      ((term.show.go rhs file)
+      ((string.show.go newline)
+      ((rules.show.go rules file)
+      x)))))
+
+// (u32.show u32) : string
+(u32.show n) = (u32.showbuild n strnil)
+  (u32.showbuild n str) = 
+    let next = (strcons (+ 48 (% n 10)) str)
+    ((u32.if (< n 10) λx(x) λx(u32.showbuild (/ n 10) x)) next)
+
+// (u32.read string) : u32
+(u32.read str) = (u32.read.go str 0)
+  (u32.read.go strnil         r) = r
+  (u32.read.go (strcons x xs) r) = (u32.if (& (<= '0' x) (<= x '9')) (u32.read.go xs (+ (* r 10) (- x '0'))) 0)
+
+// evaluation
+// ----------
+
+// counts free occurrences of a name
+// (uses string term) : u32
+(uses nm (var name))                = (name.equal name nm)
+(uses nm (use name numb))           = (name.equal name nm)
+(uses nm (met hash))                = 0
+(uses nm typ)                       = 0
+(uses nm u32)                       = 0
+(uses nm (n32 numb))                = 0
+(uses nm (o32 oper val0 val1))      = (+ (uses nm val0) (uses nm val1))
+(uses nm (ask name))                = 0
+(uses nm (ann xval xtyp))           = (uses nm xval)
+(uses nm (let name expr body))      = (+ (uses nm expr) (uses.shadow (name.equal nm name) nm body))
+(uses nm (all name type body))      = (+ (uses nm type) (uses.shadow (name.equal nm name) nm body))
+(uses nm (lam name body))           = (uses.shadow (name.equal nm name) nm body)
+(uses nm (app func argm))           = (+ (uses nm func) (uses nm argm))
+(uses nm (cts ctid args))           = (uses.many nm args)
+(uses nm (eql val0 val1))           = (+ (uses nm val0) (uses nm val1))
+(uses nm (rfl expr))                = (uses nm expr)
+(uses nm (rwt name witn goal expr)) = (+ (uses nm witn) (+ (uses.shadow (name.equal nm name) nm goal) (uses nm expr)))
+(uses.many nm nil)                  = 0
+(uses.many nm (cons x xs))          = (+ (uses nm x) (uses.many nm xs))
+(uses.shadow 0 nm body)             = (uses nm body)
+(uses.shadow 1 nm body)             = 0
+
+// appends n copies of a term to a vars context
+// (clone u32 string a (list (pair string a))) : (list (pair string a))
+(clone 0 name term ctx) = ctx
+(clone 1 name term ctx) = (cons (pair name term) ctx)
+(clone n name term ctx) = (cons (pair name term) (clone (- n 1) name term ctx))
+
+// appends enough copies of a term to a vars context
+(clonefor body name term ctx) = (clone (uses name body) name term ctx)
+
+// converts a term to high-order
+// (high file:file term:term vars:?) : hterm
+(high file term vars) = (trip.get (high.go term file vars) λfile λvars λterm term)
+
+  // (high.go file:file term:term file:file vars:(list (pair string hterm))) : (trip file (list (pair string hterm)) hterm)
+  
+  (high.go (var name) file vars) = (highfind name file vars)
+    (highfind name file nil) = (trip file nil (hvar name))
+    (highfind name file (cons (pair var val) vars)) = (highfound (name.equal name var) name var val file vars)
+      (highfound 1 name var val file vars) = (trip file vars val)
+      (highfound 0 name var val file vars) =
+        (trip.get (highfind name file vars) λfile λvars λgot
+        (trip file (cons (pair var val) vars) got))
+
+  (high.go (use name count) file vars) =
+    //(trip file vars (huse name count)) // ???
+    (high.go (var name) file vars)
+
+  (high.go (ann xval xtyp) file vars) =
+    (high.go xval file vars)
+
+  (high.go typ file vars) =
+    (trip file vars htyp)
+
+  (high.go u32 file vars) =
+    (trip file vars hu32)
+
+  (high.go (n32 numb) file vars) =
+    (trip file vars (hn32 numb))
+
+  (high.go (o32 oper val0 val1) file vars) =
+    (trip.get (high.go val0 file vars) λfile λvars λval0
+    (trip.get (high.go val1 file vars) λfile λvars λval1
+    (trip file vars (hoperate oper val0 val1))))
+
+  (high.go (ask name) file vars) =
+    (trip file vars (hask name))
+
+  (high.go (all name type body) file vars) =
+    (trip.get (high.go type file vars) λfile λvars λtype
+    (trip.get (high.go body file (clonefor body name $x vars)) λfile λvars λbody
+    (trip file vars (hall type λ$x body))))
+
+  (high.go (let name expr body) file vars) =
+    (trip.get (high.go expr file vars) λfile λvars λexpr
+    (trip.get (high.go body file (clonefor body name expr vars)) λfile λvars λbody
+    (trip file vars body)))
+
+  (high.go (lam name body) file vars) =
+    (trip.get (high.go body file (clonefor body name $x vars)) λfile λvars λbody
+    (trip file vars (hlam λ$x body)))
+
+  (high.go (app func argm) file vars) =
+    (trip.get (high.go func file vars) λfile λvars λfunc
+    (trip.get (high.go argm file vars) λfile λvars λargm
+    (trip file vars (happly func argm))))
+
+  (high.go (cts ctid args) file vars) =
+    (pair.get (file.gotfunc file ctid)      λfile λfunc
+    (trip.get (high.go.many args file vars) λfile λvars λargs
+    (high.go.cts func (hcts ctid args) file vars)))
+
+  (high.go (arg name expr) file vars) = 
+    (high.go expr file vars)
+
+  (high.go (eql val0 val1) file vars) =
+    (trip.get (high.go val0 file vars) λfile λvars λval0
+    (trip.get (high.go val1 file vars) λfile λvars λval1
+    (trip file vars (heql val0 val1))))
+
+  (high.go (rfl expr) file vars) =
+    (trip.get (high.go expr file vars) λfile λvars λexpr
+    (trip file vars (hrfl expr)))
+
+  (high.go (rwt name witn goal expr) file vars) =
+    (trip.get (high.go expr file vars) λfile λvars λexpr
+    (trip file vars expr))
+
+    //(trip.get (high.go witn file vars)                         λfile λvars λwitn
+    //(trip.get (high.go goal file (clonefor goal name $x vars)) λfile λvars λgoal
+    //(trip.get (high.go expr file vars)                         λfile λvars λexpr
+    //(trip file vars (hrwt name witn λ$x(goal) expr)))))
+
+  (high.go.many nil file vars) =
+    (trip file vars nil)
+  (high.go.many (cons x xs) file vars) =
+    (trip.get (high.go x file vars)       λfile λvars λx
+    (trip.get (high.go.many xs file vars) λfile λvars λxs
+    (trip file vars (cons x xs))))
+
+  (high.go.cts none                        term file vars) = (trip file vars term)
+  (high.go.cts (some (func lty rty rules)) term file vars) = (hfindmatchingrule rules term file vars)
+
+  (high.go (met hash) file vars) =
+    (trip file vars (hmet hash))
+
+
+// todo: perhaps linearize term?
+// (hfindmatchingrule (list rule) hterm file vars) : hterm
+(hfindmatchingrule end                  term file vars) = (trip file vars term)
+(hfindmatchingrule (rule lhs rhs rules) term file vars) = (hfindmatchingrule.found (hmatches.go lhs term) rhs rules file vars)
+  (hfindmatchingrule.found (trip lhs term 0) rhs rules file vars) = (hfindmatchingrule rules term file vars)
+  (hfindmatchingrule.found (trip lhs term 1) rhs rules file vars) = (high.go rhs file ((hmatch.go lhs term) vars))
+
+// high-order pattern-matching
+
+// tests if a lhs matches with a hterm.
+// returns the reconstructed terms, and 0/1 if not/yes.
+// (hmatches lhs hterm) : (trip term hterm bool)
+(hmatches x y) = (hmatches.go x y)
+
+  (hmatches.chain a b 0 fn cont) = (cont a b 0)
+  (hmatches.chain a b 1 fn cont) = (trip.get (fn a b) cont)
+
+  (hmatches.go (n32 x.numb) (hn32 y.numb)) = (trip (n32 x.numb) (hn32 y.numb) (== x.numb y.numb))
+
+  (hmatches.go (cts x.ctid x.args) (hcts y.ctid y.args)) = (hmatches.go.cts (== x.ctid y.ctid) x.ctid x.args y.ctid y.args)
+    (hmatches.go.cts 0 x.ctid x.args y.ctid y.args) = (trip (cts x.ctid x.args) (hcts y.ctid y.args) 0)
+    (hmatches.go.cts 1 x.ctid x.args y.ctid y.args) = (hmatches.go.cts.many x.args y.args 1 x.ctid y.ctid λz(z) λz(z))
+      (hmatches.go.cts.many nil         nil         m x.ctid y.ctid xs ys) = (trip (cts x.ctid (xs nil)) (hcts y.ctid (ys nil)) m)
+      (hmatches.go.cts.many (cons a as) (cons b bs) m x.ctid y.ctid xs ys) =
+        (hmatches.chain a b m λaλb(hmatches.go a b) λa λb λm
+        (hmatches.go.cts.many as bs m x.ctid y.ctid λk(xs (cons a k)) λk(ys (cons b k))))
+
+  (hmatches.go (use a_name uses) b) =
+    (trip (use a_name uses) b 1)
+
+  (hmatches.go a b) =
+    (trip a b 0)
+
+// (hmatch term hterm) : (list (pair string hterm))
+(hmatch x y) = ((hmatch.go x y) nil)
+
+  (hmatch.go (cts x.ctid x.args) (hcts y.ctid y.args)) = (hmatch.go.many x.args y.args)
+    (hmatch.go.many nil         nil        ) = λz (z)
+    (hmatch.go.many (cons x xs) (cons y ys)) = λz ((hmatch.go x y) ((hmatch.go.many xs ys) z))
+
+  (hmatch.go (use a_name uses) b) = λz
+    (clone uses a_name b z)
+
+  (hmatch.go a b) = λz
+    z
+
+// high-order operation
+(hoperate add (hn32 val0) (hn32 val1)) = (hn32 (+  val0 val1))
+(hoperate sub (hn32 val0) (hn32 val1)) = (hn32 (-  val0 val1))
+(hoperate mul (hn32 val0) (hn32 val1)) = (hn32 (*  val0 val1))
+(hoperate div (hn32 val0) (hn32 val1)) = (hn32 (/  val0 val1))
+(hoperate mod (hn32 val0) (hn32 val1)) = (hn32 (%  val0 val1))
+(hoperate and (hn32 val0) (hn32 val1)) = (hn32 (&  val0 val1))
+(hoperate or  (hn32 val0) (hn32 val1)) = (hn32 (|  val0 val1))
+(hoperate xor (hn32 val0) (hn32 val1)) = (hn32 (^  val0 val1))
+(hoperate shl (hn32 val0) (hn32 val1)) = (hn32 (<< val0 val1))
+(hoperate shr (hn32 val0) (hn32 val1)) = (hn32 (>> val0 val1))
+(hoperate ltn (hn32 val0) (hn32 val1)) = (hn32 (<  val0 val1))
+(hoperate lte (hn32 val0) (hn32 val1)) = (hn32 (<= val0 val1))
+(hoperate eql (hn32 val0) (hn32 val1)) = (hn32 (== val0 val1))
+(hoperate gte (hn32 val0) (hn32 val1)) = (hn32 (>= val0 val1))
+(hoperate gtn (hn32 val0) (hn32 val1)) = (hn32 (>  val0 val1))
+(hoperate neq (hn32 val0) (hn32 val1)) = (hn32 (!= val0 val1))
+(hoperate oper val0       val1)        = (ho32 oper val0 val1)
+
+// high-order application
+(happly (hlam fbody) argm) = (fbody argm)
+(happly func         argm) = (happ func argm)
+
+// converts a term to low-order
+(low term) = (low.go term 0)
+
+  (low.go (hlev name numb) depth) =
+    (var name)
+
+  (low.go (hvar name) depth) =
+    (var name)
+
+  (low.go (huse name numb) depth) =
+    (use name numb)
+
+  (low.go (hmet hash) depth) =
+    (met hash)
+
+  (low.go htyp depth) =
+    typ
+
+  (low.go hu32 depth) =
+    u32
+
+  (low.go (hn32 numb) depth) =
+    (n32 numb)
+
+  (low.go (ho32 oper val0 val1) depth) =
+    let val0 = (low.go val0 depth)
+    let val1 = (low.go val1 depth)
+    (o32 oper val0 val1)
+
+  (low.go (hask name) depth) =
+    (ask name)
+
+  (low.go (hall type body) depth) =
+    let name = (name.make (strcons (+ 97 depth) strnil))
+    let type = (low.go type depth)
+    let body = (low.go (body (hvar name)) (+ depth 1))
+    (all name type body)
+
+  (low.go (hlam body) depth) =
+    let name = (name.make (strcons (+ 97 depth) strnil))
+    let body = (low.go (body (hvar name)) (+ depth 1))
+    (lam name body)
+
+  (low.go (happ func argm) depth) =
+    let func = (low.go func depth)
+    let argm = (low.go argm depth)
+    (app func argm)
+
+  (low.go (hcts ctid args) depth) =
+    let args = (low.go.many args depth)
+    (cts ctid args)
+
+  (low.go (heql val0 val1) depth) =
+    let val0 = (low.go val0 depth)
+    let val1 = (low.go val1 depth)
+    (eql val0 val1)
+
+  (low.go (hrfl expr) depth) =
+    let expr = (low.go expr depth)
+    (rfl expr)
+
+  (low.go (hrwt name witn goal expr) depth) =
+    let name = (name.make (strcons (+ 97 depth) strnil))
+    let witn = (low.go witn depth)
+    let goal = (low.go (goal (hvar name)) (+ depth 1))
+    let expr = (low.go expr depth)
+    (rwt name witn goal expr)
+
+  (low.go.many (cons x xs) depth) =
+    let x  = (low.go x depth)
+    let xs = (low.go.many xs depth)
+    (cons x xs)
+  (low.go.many nil depth) =
+    nil
+
+// normalizes a term
+(normal file term) = (low (high file term nil))
+
+
+
+// type-checking
+// -------------
+
+// type equation {
+//   equation(a: hterm, b: hterm, ctx: ctx)
+// }
+
+// type argument {
+//   argument(name: name, type: hterm)
+// }
+
+// result : type -> type
+// result a
+//   = checked (list equation) (list argument) a
+//   | errored string
+
+(chain (errored str)         b_result) = (errored str)
+(chain (checked eqs ars val) b_result) = (b_result eqs ars val)
+
+// (infer.go file term ctx) : (result hterm)
+(infer file term ctx) = (infer.unify file 0 (infer.go file term ctx nil nil))
+
+  (infer.unify file capt (errored err)        ) = (errored err)
+  (infer.unify file capt (checked eqs ars typ)) = (infer.finish (unify file capt eqs ars empty) typ)
+
+  (infer.finish (errored err)           typ) = (errored err)
+  (infer.finish (checked eqs ars subst) typ) = (checked eqs ars (pair subst (holes.subst subst typ)))
+
+  // (infer.go file term ctx (list equation)) : (result hterm)
+
+  // todo: linearize file? probably not needed
+  (infer.go file (var name) ctx eqs ars) = (infer.go.find name ctx eqs ars)
+    (infer.go.find name nil eqs ars) = (errored (string.flatten ["unbound: " (name.getstring name) "\n"]))
+    (infer.go.find name (cons (pair var typ) ctx) eqs ars) = (infer.go.found (name.equal name var) name typ ctx eqs ars)
+      (infer.go.found 1 name typ ctx eqs ars) = (checked eqs ars typ)
+      (infer.go.found 0 name typ ctx eqs ars) = (infer.go.find name ctx eqs ars)
+
+  (infer.go file (met hash) ctx eqs ars) =
+    (checked eqs ars htyp)
+
+  (infer.go file typ ctx eqs ars) =
+    (checked eqs ars htyp)
+
+  (infer.go file u32 ctx eqs ars) =
+    (checked eqs ars htyp)
+
+  (infer.go file (n32 numb) ctx eqs ars) =
+    (checked eqs ars hu32)
+
+  (infer.go file (o32 oper val0 val1) ctx eqs ars) =
+    (chain (check.go file val0 hu32 ctx eqs ars) λeqs λars λok
+    (chain (check.go file val1 hu32 ctx eqs ars) λeqs λars λok
+    (checked eqs ars hu32)))
+
+  (infer.go file (ask name) ctx eqs ars) =
+    (checked eqs ars (hask name))
+
+  (infer.go file (ann xval xtyp) ctx eqs ars) =
+    let htyp = (high file xtyp nil)
+    (chain (check.go file xtyp htyp ctx eqs ars) λeqs λars λok
+    (chain (check.go file xval htyp ctx eqs ars) λeqs λars λok
+    (checked eqs ars htyp)))
+
+  (infer.go file (all name type body) ctx eqs ars) =
+    (chain (check.go file type htyp ctx eqs ars) λeqs λars λok
+    (chain (check.go file body htyp (cons (pair name (high file type nil)) ctx) eqs ars) λeqs λars λok
+    (checked eqs ars htyp)))
+
+  (infer.go file (let name expr body) ctx eqs ars) =
+    (chain (infer.go file expr ctx eqs ars) λeqs λars λexpr_t
+    (infer.go file body (cons (pair name expr_t) ctx) eqs ars))
+
+  (infer.go file (lam name body) ctx eqs ars) =
+    (errored "can't infer lambda.")
+
+  (infer.go file (app func argm) ctx eqs ars) =
+    (chain (infer.go file func ctx eqs ars) λeqs λars λft (infer.go.app file ft argm ctx eqs ars))
+      (infer.go.app file (hall ftype fbody) argm ctx eqs ars) =
+        (chain (check.go file argm ftype ctx eqs ars) λeqs λars λok
+        (checked eqs ars (fbody (high file argm nil))))
+      (infer.go.app file other argm ctx eqs ars) =
+        (errored "non-function application.")
+
+  (infer.go file (eql val0 val1) ctx eqs ars) =
+    (chain (infer.go file val0 ctx eqs ars) λeqs λars λval0_t
+    (chain (infer.go file val1 ctx eqs ars) λeqs λars λval1_t
+    (checked eqs ars htyp)))
+
+  (infer.go file (rfl expr) ctx eqs ars) =
+    let hexpr = (high file expr nil)
+    (checked eqs ars (heql hexpr hexpr))
+
+  (infer.go file (rwt name witn goal expr) ctx eqs args) =
+    (chain (infer.go file witn ctx eqs args) λeqs λars λwitn_typ
+    (infer.go.rwt file witn_typ name goal expr ctx eqs ars))
+
+    (infer.go.rwt file (heql val0 val1) name goal expr ctx eqs ars) =
+      let goal = λx (high file goal (clonefor goal name x nil))
+      (chain (check.go file expr (goal val1) ctx eqs ars) λeqs λars λok
+      (checked eqs ars (goal val0)))
+    (infer.go.rwt file a name goal expr ctx eqs ars) =
+      (errored "invalid rewrite witness.")
+
+  (infer.go file (rwt name witn goal expr) ctx eqs args) =
+    (errored "can't infer rewrite.")
+
+  // cts checker
+  (infer.go file (cts id args) ctx eqs ars) = (infer.go.cts.findfunc file id (cts id args) ctx eqs ars)
+
+    // 1. find cts's type on file
+    (infer.go.cts.findfunc file ctid term ctx eqs ars) =
+      (pair.get (file.gotfunc file ctid) λfile λfunc
+      (maybe.case func (errored "type not found.") λfunc // shouldn't be reachable, since it defaults
+      (func.get func λlty λrty λrul
+      (infer.go.cts.makelist file ctid lty rty term ctx eqs ars))))
+
+    // 2. convert types and args to lists (fixme: not necessary anymore, remove)
+    (infer.go.cts.makelist file ctid (cts t.id t.args) rt (cts id args) ctx eqs ars) =
+      (infer.go.cts.checklist file t.args args rt [] ctx eqs ars)
+
+    // 3. recursively checks the lists
+    (infer.go.cts.checklist file nil nil rtyp sub ctx eqs ars) =
+      (checked eqs ars (infer.go.cts.high file rtyp sub))
+    (infer.go.cts.checklist file (cons typ typs) (cons val vals) rtyp sub ctx eqs ars) =
+      (arg.get typ λtyp.name λtyp.expr
+      let hig = (high file val nil)
+      let typ = (infer.go.cts.high file typ.expr sub)
+      let sub = (cons (pair typ.name hig) sub)
+      (chain (check.go file val typ ctx eqs ars) λeqs λars λres
+      (infer.go.cts.checklist file typs vals rtyp sub ctx eqs ars)))
+    (infer.go.cts.checklist file typs vals rtyp sub ctx eqs ars) =
+      (errored "arity mismatch.")
+      
+    // convert term to high-order, substituting arguments
+    (infer.go.cts.high file term vars) = (high file term (infer.go.cts.high.vars file term vars))
+      (infer.go.cts.high.vars file term nil) = nil
+      (infer.go.cts.high.vars file term (cons (pair name expr) vals)) =
+        (clonefor term name expr
+        (infer.go.cts.high.vars file term vals))
+
+// (check file term hterm ctx) : (result subst)
+(check file term type ctx) = (checkunify file 0 (check.go file term type ctx nil nil))
+
+  // (checkunify file capt (result unit)) : (result (map hterm))
+  (checkunify file capt (errored err))         = (errored err)
+  (checkunify file capt (checked eqs ext uni)) = (unify file capt eqs ext empty)
+
+  // (check.go file term hterm ctx (list equation)) : (result unit)
+
+  // todo: store (name : typ) on match list?
+  (check.go file (use name numb) typ ctx eqs ext) =
+    (checked eqs (cons (pair name typ) ext) unit)
+
+  (check.go file (met hash) type ctx eqs ext) =
+    (checked eqs ext unit)
+
+  // fixme: cache depth to avoid list.length
+  (check.go file (lam name body) (hall t_type t_body) ctx eqs ext) =
+    (chain (check.go file body (t_body (hlev name (list.length ctx))) (cons (pair name t_type) ctx) eqs ext) λeqs λext λres
+    (checked eqs ext res))
+
+  (check.go file (let name expr body) type ctx eqs ext) =
+    (chain (infer.go file expr ctx eqs ext) λeqs λext λexpr_t
+    (check.go file body type (cons (pair name expr_t) ctx) eqs ext))
+
+  // fixme: optimize by storing the recursion depth, avoiding list.length
+  (check.go file term type ctx eqs ext) =
+    (chain (infer.go file term ctx eqs ext) λeqs λext λterm_t
+    (checked (cons (equation type term_t (list.length ctx) ctx) eqs) ext unit))
+
+// todo: i don't want to commit to any complex unification algorithm, so this
+// implementation will just substitute immediate (flex-rigid) terms, for now.
+// in a future, we should revisit this, and decide what unification and
+// resolution algorithms we want to have on the language.
+// (unify file capt eqs:(list (pair hterm hterm)) subs:(map hterm)) : (result (map hterm))
+(unify file capt eqs ext subst) = (unify.go file capt eqs ext subst nil)
+  (unify.go file capt nil ext subst nil)  = (checked nil ext subst)
+  (unify.go file capt nil ext subst errs) = (errored (string.join (list.map errs λx(x subst)) newline))
+  (unify.go file capt (cons (equation a b dep ctx) eqs) ext subst errs) =
+    (trip.get (equal file capt a b dep subst ext) λsubst λext λeq
+    (unifytest file capt eq a b ctx eqs ext subst errs))
+
+  (unifytest file capt 0 a b ctx eqs ext subst errs) =
+    let err = λsubst (string.flatten [
+      "type mismatch." newline
+      "- expected: " (term.show file (low (holes.subst subst a))) newline
+      "- detected: " (term.show file (low (holes.subst subst b))) newline
+      (context.show (list.map ctx λp(pair.mutsnd p λx(low (holes.subst subst x)))) file) newline
+    ])
+    (unify.go file capt eqs ext subst (cons err errs))
+  (unifytest file capt 1 a b ctx eqs ext subst errs) =
+    (unify.go file capt eqs ext subst errs)
+
+// fixme: this will loop if we subst `a_hash <- (hmet a_hash)`, since the equal
+// rewrite rule will be called repeatedly. i don't have the time to reason about
+// this right now, so i'll leave this to a future.
+// (equal u32 hterm hterm u32 subst (list argument)) : (trip subst (list argument) bool)
+
+(equal file k (hlev a_name a_numb) (hlev b_name b_numb) depth subst ext) =
+  (trip subst ext (== a_numb b_numb))
+
+(equal file 0 (hvar a_name) (hvar b_name) depth subst ext) =
+  (trip subst ext (name.equal a_name b_name))
+
+(equal file 1 (hvar a_name) b depth subst ext) =
+  (capt file (hvar a_name) b subst ext)
+
+(equal file 1 a (hvar b_name) depth subst ext) =
+  (capt file a (hvar b_name) subst ext)
+
+(equal file k htyp htyp depth subst ext) =
+  (trip subst ext 1)
+
+(equal file k hu32 hu32 depth subst ext) =
+  (trip subst ext 1)
+
+(equal file k (hn32 a_numb) (hn32 b_numb) depth subst ext) =
+  (trip subst ext (== a_numb b_numb))
+
+(equal file k (ho32 a_oper a_val0 a_val1) (ho32 b_oper b_val0 b_val1) depth subst ext) =
+  (trip.get (equal file k a_val0 b_val0 depth subst ext) λsubst λext λval0_eq
+  (trip.get (equal file k a_val1 b_val1 depth subst ext) λsubst λext λval1_eq
+  (trip subst ext (& (== a_oper b_oper) (& val0_eq val1_eq)))))
+
+(equal file k (hask a_name) (hask b_name) depth subst ext) =
+  (trip subst ext 1)
+
+(equal file k (hall a_type a_body) (hall b_type b_body) depth subst ext) =
+  (trip.get (equal file k a_type b_type depth subst ext) λsubst λext λtype_eq
+  (trip.get (equal file k (a_body (hlev "" depth)) (b_body (hlev "" depth)) (+ depth 1) subst ext) λsubst λext λbody_eq
+  (trip subst ext (& type_eq body_eq))))
+
+(equal file k (hlam a_body) (hlam b_body) depth subst ext) =
+  (trip.get (equal file k (a_body (hlev "" depth)) (b_body (hlev "" depth)) (+ depth 1) subst ext) λsubst λext λbody_eq
+  (trip subst ext body_eq))
+
+(equal file k (happ a_func a_argm) (happ b_func b_argm) depth subst ext) =
+  (trip.get (equal file k a_func b_func depth subst ext) λsubst λext λfunc_eq
+  (trip.get (equal file k a_argm b_argm depth subst ext) λsubst λext λargm_eq
+  (trip subst ext (& func_eq argm_eq))))
+
+(equal file k (hcts a.ctid a.args) (hcts b.ctid b.args) depth subst ext) =
+  (equal.hcts file (equal.capts file k a.ctid b.ctid) (== a.ctid b.ctid) (hcts a.ctid a.args) (hcts b.ctid b.args) depth subst ext)
+
+  (equal.hcts file 0 0 a                    b                    depth subst ext) = (trip subst ext 0)
+  (equal.hcts file 1 0 a                    b                    depth subst ext) = (capt file a b subst ext)
+  (equal.hcts file k 1 (hcts a.ctid a.args) (hcts b.ctid b.args) depth subst ext) = (equal.many file k a.args b.args depth subst ext)
+    
+(equal file k (heql a_val0 a_val1) (heql b_val0 b_val1) depth subst ext) =
+  (trip.get (equal file k a_val0 b_val0 depth subst ext) λsubst λext λval0_eq
+  (trip.get (equal file k a_val1 b_val1 depth subst ext) λsubst λext λval1_eq
+  (trip subst ext (& val0_eq val1_eq))))
+
+(equal file k (hrwt a_name a_witn a_goal a_expr) (hrwt b_name b_witn b_goal b_expr) depth subst ext) =
+  (trip.get (equal file k a_witn b_witn depth subst ext) λsubst λext λwitn_eq
+  (trip.get (equal file k (a_goal (hlev "" depth)) (b_goal (hlev "" depth)) (+ depth 1) subst ext) λsubst λext λbody_eq
+  (trip.get (equal file k a_expr b_expr depth subst ext) λsubst λext λexpr_eq
+  (tri subst ext (& witn_eq (& body_eq expr_eq))))))
+
+(equal file k (hmet a_hash) (hmet b_hash) depth subst ext) =
+  (trip subst ext 1)
+
+(equal file k (hmet a_hash) b depth subst ext) = (pair.get (get subst a_hash) λsubst λgot_a (equal.got.0 file k a_hash got_a b depth subst ext))
+  (equal.got.0 file k a_hash none     b depth subst ext) = (trip (set subst a_hash b) ext 1)
+  (equal.got.0 file k a_hash (some a) b depth subst ext) = (equal file k a b depth subst ext)
+
+(equal file k a (hmet b_hash) depth subst ext) = (pair.get (get subst b_hash) λsubst λgot_b (equal.got.1 file k b_hash a got_b depth subst ext))
+  (equal.got.1 file k b_hash a none     depth subst ext) = (trip (set subst b_hash a) ext 1)
+  (equal.got.1 file k b_hash a (some b) depth subst ext) = (equal file k a b depth subst ext)
+
+(equal file k a b depth subst ext) =
+  (trip subst ext 0)
+
+(equal.many file k nil         nil         depth subst ext) = (trip subst ext 1)
+(equal.many file k nil         (cons b bs) depth subst ext) = (trip subst ext 0)
+(equal.many file k (cons a as) nil         depth subst ext) = (trip subst ext 0)
+(equal.many file k (cons a as) (cons b bs) depth subst ext) =
+  (trip.get (equal      file k a  b  depth subst ext) λsubst λext λa.eq
+  (trip.get (equal.many file k as bs depth subst ext) λsubst λext λas.eq
+  (trip subst ext (& a.eq as.eq))))
+
+(equal.capts file k a.ctid b.ctid) =
+  (u32.and k (& (file.isctr file a.ctid) (file.isctr file b.ctid)))
+
+(capt file a b subst ext) =
+  //let a_s = (term.show (file.make []) (low a))
+  //let b_s = (term.show (file.make []) (low b))
+  //let var = (hvar (name.make (string.flatten [a_s " == " b_s]))) // fixme: temporary hack for visualization, until equality is implemented
+  let cap = (heql b a)
+  let ext = (cons (pair (name.make (string.concat "." (u32.show (list.length ext)))) cap) ext)
+  (trip subst ext 1)
+
+// (holes.subst subst hterm) : hterm
+(holes.subst subst (hvar name))                = (hvar name)
+(holes.subst subst (hlev name numb))           = (hlev name numb)
+(holes.subst subst (huse name numb))           = (huse name numb)
+(holes.subst subst htyp)                       = htyp
+(holes.subst subst hu32)                       = hu32
+(holes.subst subst (hn32 numb))                = (hn32 numb)
+(holes.subst subst (ho32 oper val0 val1))      = (ho32 oper (holes.subst subst val0) (holes.subst subst val1))
+(holes.subst subst (hask name))                = (hask name)
+(holes.subst subst (hann xval xtyp))           = (hann (holes.subst subst xval) (holes.subst subst xtyp))
+(holes.subst subst (hlet expr body))           = (hlet (holes.subst subst expr) λx(holes.subst subst (body x)))
+(holes.subst subst (hall type body))           = (hall (holes.subst subst type) λx(holes.subst subst (body x)))
+(holes.subst subst (hlam body))                = (hlam λx(holes.subst subst (body x)))
+(holes.subst subst (happ func argm))           = (happ (holes.subst subst func) (holes.subst subst argm))
+(holes.subst subst (hcts ctid args))           = (hcts ctid args)
+(holes.subst subst (heql val0 val1))           = (heql (holes.subst subst val0) (holes.subst subst val1))
+(holes.subst subst (hrfl expr))                = (hrfl (holes.subst subst expr))
+(holes.subst subst (hrwt name witn goal expr)) = (hrwt name (holes.subst subst witn) λx(holes.subst subst (goal x)) (holes.subst subst expr))
+(holes.subst subst (hmet hash))                = (pair.get (get subst hash) λsubst λgot (holesgot.subst subst hash got))
+  (holesgot.subst subst hash none)             = (hmet hash)
+  (holesgot.subst subst hash (some x))         = (holes.subst subst x)
+
+// (holes.count term) : u32
+(holes.count (var name))                = 0
+(holes.count (lev name numb))           = 0
+(holes.count (use name numb))           = 0
+(holes.count typ)                       = 0
+(holes.count u32)                       = 0
+(holes.count (n32 numb))                = 0
+(holes.count (o32 oper val0 val1))      = (+ (holes.count val0) (holes.count val1))
+(holes.count (ask name))                = 0
+(holes.count (ann xval xtyp))           = (+ (holes.count xval) (holes.count xtyp))
+(holes.count (let name expr body))      = (+ (holes.count expr) (holes.count body))
+(holes.count (all name type body))      = (+ (holes.count type) (holes.count body))
+(holes.count (lam name body))           = (holes.count body)
+(holes.count (app func argm))           = (+ (holes.count func) (holes.count argm))
+(holes.count (cts ctid args))           = (holes.count.many args)
+(holes.count (eql val0 val1))           = (+ (holes.count val0) (holes.count val1))
+(holes.count (rfl expr))                = (holes.count expr)
+(holes.count (rwt name witn goal expr)) = (+ (holes.count witn) (+ (holes.count goal) (holes.count expr)))
+(holes.count (met hash))                = 1
+
+(holes.count.many nil)         = 0
+(holes.count.many (cons x xs)) = (+ (holes.count x) (holes.count.many xs))
+
+// (verify.file file) : string
+(verify.file file) = (verify.funcs file (array.tolist (file.getfuncs file)))
+
+// (verify.funcs file (list func)) : string
+(verify.funcs file nil) = strnil
+(verify.funcs file (cons func funcs)) =
+  let head = (verify.func file func)
+  let tail = (verify.funcs file funcs)
+  (string.concat head tail)
+
+// (verify.func file func) : string
+(verify.func file (func lty rty rules)) =
+  let name = (func.getname (func lty rty rules) file)
+  let err  = (verify.rules file lty rty rules)
+  (verify.print name err)
+
+  (verify.print name err) =
+    (if (string.isempty err) ""
+      let title = (string.flatten ["error on '" name "':"])
+      let tline = (string.map title λx('-'))
+      (string.flatten [
+        newline
+        title newline
+        tline newline
+        newline
+        err
+        newline
+      ]))
+
+// (verify.rules file term term rules) : string
+(verify.rules file lty rty end) = ""
+(verify.rules file lty rty (rule lhs rhs rules)) =
+  let hols = (holes.count rhs)
+  let head = (verify.rule  file lty rty lhs rhs)
+  let tail = (verify.rules file lty rty rules)
+  (verify.rules.concaterrors hols head tail)
+
+  (verify.rules.concaterrors hols (errored err)          str) = (string.concat err str)
+  (verify.rules.concaterrors hols (checked eqs ext subs) str) =
+    ((u32.if (u32.not (== (len subs) hols))
+      λstr (string.concat "unfilled holes." str)
+      λstr (str))
+      str)
+
+// (verify.rule file term term term term) : (result (map hterm))
+(verify.rule file (cts typ.ctid typ.args) r.typ (cts val.ctid val.args) r.val) =
+  (verify.rule.list file typ.args r.typ val.args r.val)
+(verify.rule file a.typ r.typ a.val r.val) =
+  let rule_name = (maybe.case (file.idtoname file (ctr.getid a.val)) "?" λx(x))
+  (errored (string.flatten [
+    "mistyped rule: " rule_name newline newline 
+  ]))
+
+// (verify.rule.list file term term term term) : (result (map hterm))
+(verify.rule.list file typs r.typ vals r.val) =
+  (checkunify file 0 (verify.rule.list.go file typs r.typ vals r.val nil nil nil))
+
+  (verify.rule.list.go file nil r.typ nil r.val pre eqs ext) =
+    let sub = (verify.rule.list.sub r.typ pre)
+    let hty = (high file r.typ sub)
+    (check.go file r.val hty ext eqs ext)
+  (verify.rule.list.go file (cons typ typs) r.typ (cons val vals) r.val pre eqs ext) =
+    (arg.get typ λtyp.name λtyp.expr
+    let hva = (high file val nil)
+    let hty = (high file typ.expr (verify.rule.list.sub typ.expr pre))
+    let pre = (cons (pair typ.name hva) pre)
+    (chain (checkunify file 1 (check.go file val hty nil eqs ext)) λeqs λext λok
+    (verify.rule.list.go file typs r.typ vals r.val pre eqs ext)))
+  (verify.rule.list.sub bod nil) = nil
+  (verify.rule.list.sub bod (cons (pair name type) vals)) =
+    (clonefor bod name type (verify.rule.list.sub bod vals))
+
+
+
+// compiler
+// ========
+
+(compile.to_khvm (lam name body)) =
+  λx((string.show.go (name.getstring name))
+    ((compile.to_khvm body)
+    x))
+
+// compiler
+// ------------
+
+// (term.compile term:term file:file) : string
+(term.compile file term) = ((term.compile.go term file) "")
+  (term.compile.go (var name) file) =
+    λx((string.compile.go (name.getstring name))
+      x)
+  (term.compile.go (use name uses) file) =
+    λx((string.compile.go "$")
+      ((string.compile.go (name.getstring name))
+      x))
+  (term.compile.go (met hash) file) =
+    λx((string.show.go "_")
+    ......................................................
+      ((string.show.go (u32.show hash))
+      x))
+  (term.show.go (let name expr body) file) =
+    λx((string.show.go "let ")
+      ((string.show.go (name.getstring name))
+      ((string.show.go " = ")
+      ((term.show.go expr file)
+      ((string.show.go "; ")
+      ((term.show.go body file)
+      x))))))
+  (term.show.go (ann xval xtyp) file) =
+    λx((string.show.go "(")
+      ((term.show.go xval file)
+      ((string.show.go " :: ")
+      ((term.show.go xtyp file)
+      ((string.show.go ")")
+      x)))))
+  (term.show.go typ file) =
+    λx((string.show.go "type")
+      x)
+  (term.show.go u32 file) =
+    λx((string.show.go "u32")
+      x)
+  (term.show.go (n32 numb) file) =
+    λx((string.show.go (u32.show numb))
+      x)
+  (term.show.go (o32 oper val0 val1) file) =
+    λx((string.show.go "(")
+      ((oper.show.go oper)
+      ((string.show.go " ")
+      ((term.show.go val0 file)
+      ((string.show.go " ")
+      ((term.show.go val1 file)
+      ((string.show.go ")")
+      x)))))))
+  (term.show.go (ask name) file) =
+    λx((string.show.go "?")
+      ((string.show.go name)
+      x))
+  (term.show.go (all name type body) file) =
+    λx((string.show.go "∀(")
+      ((string.show.go (name.getstring name))
+      ((string.show.go ": ")
+      ((term.show.go type file)
+      ((string.show.go ") ")
+      ((term.show.go body file)
+      x))))))
+  (term.show.go (lam name body) file) =
+    λx((string.show.go "λ")
+      ((string.show.go (name.getstring name))
+      ((string.show.go " ")
+      ((term.show.go body file)
+      x))))
+  (term.show.go (app func argm) file) =
+    λx((string.show.go "(")
+      ((term.show.go func file)
+      ((string.show.go " ")
+      ((term.show.go argm file)
+      ((string.show.go ")")
+      x)))))
+  (term.show.go (cts ctid args) file) =
+    λx((string.show.go "(")
+      ((term.show.go.ctrname ctid file)
+      ((term.show.go.cts.args args file)
+      ((string.show.go ")")
+      x))))
+  (term.show.go (eql val0 val1) file) =
+    λx((term.show.go val0 file)
+      ((string.show.go " == ")
+      ((term.show.go val1 file)
+      x)))
+  (term.show.go (rfl expr) file) =
+    λx((string.show.go "refl ")
+      ((term.show.go expr file)
+      x))
+  (term.show.go (rwt name witn goal expr) file) =
+    λx((string.show.go "rewrite ")
+      ((string.show.go (name.getstring name))
+      ((string.show.go "with ")
+      ((term.show.go witn file)
+      ((string.show.go "in ")
+      ((term.show.go goal file)
+      ((string.show.go " ")
+      ((term.show.go expr file)
+      x))))))))
+  (term.show.go.ctrname id file) =
+    (maybe.case (file.idtoname file id)
+      (string.show.go (u32.show id))
+      λname (string.show.go name))
+  (term.show.go.cts.args nil file) =
+    λx(x)
+  (term.show.go.cts.args (cons arg args) file) =
+    λx((string.show.go " ")
+      ((term.show.go arg file)
+      ((term.show.go.cts.args args file)
+      x)))
+  (string.show.go xs) =
+    λx(string.concat xs x)
+  (oper.show.go add) = (string.show.go "+")
+  (oper.show.go sub) = (string.show.go "-")
+  (oper.show.go mul) = (string.show.go "*")
+  (oper.show.go div) = (string.show.go "/")
+  (oper.show.go mod) = (string.show.go "%")
+  (oper.show.go and) = (string.show.go "&")
+  (oper.show.go or)  = (string.show.go "|")
+  (oper.show.go xor) = (string.show.go "^")
+  (oper.show.go shl) = (string.show.go "<<")
+  (oper.show.go shr) = (string.show.go ">>")
+  (oper.show.go ltn) = (string.show.go "<")
+  (oper.show.go lte) = (string.show.go "<=")
+  (oper.show.go eql) = (string.show.go "==")
+  (oper.show.go gte) = (string.show.go ">=")
+  (oper.show.go gtn) = (string.show.go ">")
+  (oper.show.go neq) = (string.show.go "!=")
+
+(context.show nil file) = ""
+(context.show ctx file) =
+  let ctx = (list.reverse ctx)
+  let build = λz
+    ((string.show.go "context:")
+    ((string.show.go newline)
+    ((context.show.go ctx file)
+      z)))
+  (build "")
+
+  (context.show.go nil file) = λz(z)
+  (context.show.go (cons (pair name type) rest) file) =
+    λz((string.show.go "- ")
+      ((string.show.go (name.getstring name))
+      ((string.show.go " : ") 
+      ((term.show.go type file)
+      ((string.show.go newline)
+      ((context.show.go rest file)
+      z))))))
+
+(file.show file) = ((file.show.go (array.tolist (file.getfuncs file)) file) "")
+  (file.show.go nil file) =
+    λz(z)
+  (file.show.go (cons (func lhs.t lhs.r rules) funs) file) =
+    λz((term.show.go lhs.t file)
+      ((string.show.go " : ")
+      ((term.show.go lhs.r file)
+      ((string.show.go newline)
+      ((rules.show.go rules file)
+      ((string.show.go newline)
+      ((file.show.go funs file)
+      z)))))))
+  (rules.show.go end file) =
+    λx(x)
+  (rules.show.go (rule lhs rhs rules) file) =
+    λx((term.show.go lhs file)
+      ((string.show.go " = ")
+      ((term.show.go rhs file)
+      ((string.show.go newline)
+      ((rules.show.go rules file)
+      x)))))
+
+// (u32.show u32) : string
+(u32.show n) = (u32.showbuild n strnil)
+  (u32.showbuild n str) = 
+    let next = (strcons (+ 48 (% n 10)) str)
+    ((u32.if (< n 10) λx(x) λx(u32.showbuild (/ n 10) x)) next)
+
+// (u32.read string) : u32
+(u32.read str) = (u32.read.go str 0)
+  (u32.read.go strnil         r) = r
+  (u32.read.go (strcons x xs) r) = (u32.if (& (<= '0' x) (<= x '9')) (u32.read.go xs (+ (* r 10) (- x '0'))) 0)
+
+
+
+// #############################################################################
+// # tests                                                                     #
+// #############################################################################
+
+
+
+(test.0) = "
+  // booleans
+  bool : type
+    true  : bool
+    false : bool
+
+  // natural numbers
+  nat : type
+    zero         : nat
+    (succ n:nat) : nat
+
+  // lists
+  (list t:type) : type
+    (nil t:type)                  : (list t)
+    (cons t:type x:t xs:(list t)) : (list t)
+
+  // equality (non-native)
+  (equal t:type a:t b:t) : type
+    (refl t:type a:t) : (equal t a a)
+
+  // negates a boolean
+  (bool.not b:bool) : bool
+    (bool.not true)  = false
+    (bool.not false) = true
+
+  // doubles a number
+  (nat.double n:nat) : nat
+    (nat.double zero)     = zero
+    (nat.double (succ n)) = (succ (succ (nat.double n)))
+
+  // halves a number
+  (nat.half n:nat) : nat
+    (nat.half zero)            = zero
+    (nat.half (succ zero))     = zero
+    (nat.half (succ (succ x))) = (succ (nat.half x))
+
+  // computes 2^n
+  (nat.pow2 n:nat) : nat
+    (nat.pow2 zero)     = (succ zero)
+    (nat.pow2 (succ n)) = (nat.double (nat.pow2 n)) 
+
+  // destroys a nat into 0
+  (nat.destroy n:nat) : nat
+    (nat.destroy zero)     = zero
+    (nat.destroy (succ n)) = (nat.destroy n)
+
+  // returns the first element of a list
+  (list.head t:type x:(list t)) : t
+    (list.head t (cons t x xs)) = x
+
+  // symmetry of equality
+  (sym t:type a:t b:t e:{a == b}) : {b == a}
+    (sym t a b e) =
+      rewrite x with e in {b == x}
+      refl b
+
+  // transitivity of equality
+  (trans t:type a:t b:t c:t e0:{a == b} e1:{b == c}) : {a == c}
+  (trans t a b c e0 e1) =
+    rewrite x with e0 in {x == c}
+    e1
+
+  // congruence of equality
+  (cong t:type u:type a:t b:t f:∀(x:t)u e:{a == b}) : {(f a) == (f b)}
+    (cong t u a b f e) =
+      rewrite x with e in {(f x) == (f b)}
+      refl (f b)
+
+  // casting values to another equal type
+  (cast a:type b:type e:{a == b} x:a) : b
+    (cast a b e x) =
+      rewrite x with (sym type a b e) in x
+      x
+
+  // symmetry of equality on equal
+  (equal.sym t:type a:t b:t e:(equal t a b)) : (equal t b a)
+    (equal.sym t a b (refl u x)) =
+      def xx = (cast u t .5 x)
+      let e0 = (sym t xx a .6)
+      let e1 = (trans t a xx b e0 .7)
+      rewrite x with e1 in (equal t b x)
+      (refl t b)
+
+  // double negation theorem
+  (bool.dnt b:bool) : {(bool.not (bool.not b)) == b}
+    (bool.dnt true)  = refl true
+    (bool.dnt false) = refl false
+
+  // double negation theorem on equal
+  (equal.bool.dnt b:bool) : (equal bool (bool.not (bool.not b)) b)
+    (equal.bool.dnt true)  = (refl bool true)
+    (equal.bool.dnt false) = (refl bool false)
+
+  // black friday theorem
+  (nat.bft n:nat) : {(nat.half (nat.double n)) == n}
+    (nat.bft zero)            = refl zero
+    (nat.bft (succ zero))     = refl (succ zero)
+    (nat.bft (succ (succ n))) =
+      let e0 = (nat.bft n)
+      let e1 = (cong _ _ _ _ λx(succ x) e0)
+      let e2 = (cong _ _ _ _ λx(succ x) e1)
+      e2
+
+  foo : nat
+    foo = (nat.destroy (nat.pow2
+      (succ (succ (succ (succ (succ (succ (succ
+      (succ (succ (succ (succ (succ (succ (succ
+      zero))))))))))))))))
+
+  //main : {foo == zero}
+    //main = refl zero
+
+  (bar n:u32) : u32
+    (bar 0) = 0
+    (bar 1) = 10
+    (bar x) = 20
+
+  main : u32
+    main = (* (+ (bar 1) 1) 2)
+"
+
+(kind2.check code) = (kind2.check.go (file.read code))
+  (kind2.check.go (er err))  = err
+  (kind2.check.go (ok file)) = (verify.file file)
+
+(kind2.run code) = (kind2.run.go (file.read code) "main")
+  (kind2.run.go (er err)  expr) = err
+  (kind2.run.go (ok file) expr) = (term.show file (normal file (term.read file expr)))
+
+//(main n) = (kind2.check test.0)
+//(main n) = (kind2.run test.0)
+
+(result.expect (ok file)) = file
+(maybe.expect (some x)) = x
+
+(rule.lhs (rule lhs rhs rest)) = lhs
+(rule.rhs (rule lhs rhs rest)) = rhs
+(rule.rest (rule lhs rhs rest)) = rest
+
+(main n) =
+  let code = "
+    // booleans
+    bool : type
+      true  : bool
+      false : bool
+
+    // negates a boolean
+    (bool.not b:bool) : bool
+      (bool.not true)  = false
+      (bool.not false) = true
+  "
+  let file = (result.expect (file.read code))
+  let fnid = (maybe.expect (file.nametoid file "bool.not"))
+  let func = (maybe.expect (pair.snd (file.gotfunc file fnid)))
+  let lhs  = (rule.lhs (func.getrules func))
+  (term.show file lhs)

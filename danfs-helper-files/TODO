@@ -1,0 +1,9 @@
+# TODO
+
+* Como são feitos Lambdas em Kind2?
+* Kdl não é tipada, as anotações de tipos são descartáveis?
+* Kdl tem provas? Se não, não precisa de nenhum dos auxiliares de provas (Equal, Refl, Rewrite)
+* O que são:
+  * Met
+  * Ask
+  * App
