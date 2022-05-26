@@ -1822,9 +1822,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   // (Term.Compile.Go U32 file) =
   //   λx((String.Show.Go "U32")
   //     x)
-//   (Term.Compile.Go (N32 numb) file) =
-//     λx((String.Show.Go (U32.Show numb))
-//       x)
+  (Term.Compile.Go (N32 numb) file) =
+    λx((String.Show.Go "#")
+      ((String.Show.Go (U32.Show numb))
+      x))
 //   (Term.Compile.Go (O32 oper val0 val1) file) =
 //     λx((String.Show.Go "(")
 //       ((Oper.Show.Go oper)
@@ -2179,7 +2180,27 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     // Computes 2^n
     (Nat.Pow2 n:Nat) : Nat
       (Nat.Pow2 Zero)     = (Succ Zero)
-      (Nat.Pow2 (Succ n)) = (Nat.Double (Nat.Pow2 n)) 
+      (Nat.Pow2 (Succ n)) = (Nat.Double (Nat.Pow2 n))
+
+    // Destroys a Nat into 0
+    (Nat.Destroy n:Nat) : Nat
+      (Nat.Destroy Zero)     = Zero
+      (Nat.Destroy (Succ n)) = (Nat.Destroy n)
+
+    // Returns the first element of a list
+    (List.Head t:Type x:(List t)) : t
+      (List.Head t (Cons t x xs)) = x
+
+    Foo : Nat
+    Foo = (Nat.Destroy (Nat.Pow2
+      (Succ (Succ (Succ (Succ (Succ (Succ (Succ
+      (Succ (Succ (Succ (Succ (Succ (Succ (Succ
+      Zero))))))))))))))))
+
+    (Bar n:U32) : U32
+      (Bar 0) = 0
+      (Bar 1) = 10
+      (Bar x) = 20
   "
 
   // let file = (GetFile (File.Read code))
