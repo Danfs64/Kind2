@@ -1,16 +1,27 @@
 # TOASK
 
-* Não precisa dos Types?
-  * Exemplo: Terá os construtores $(Zero) e $(Succ n), mas não terá um $(Nat)
+## Dúvidas Gerais
+
+* HVM-KDL tem Let?
 * Como são feitos Lambdas em Kind2?
+  * Eu tentei e tomei um parser error :c
 * Initial State de todas as funções seria #0?
-* Colocar alguma identação nos cases de funções?
-  * Numa nota mais genérica: O quanto se preocupar com estética do código gerado, if at all
-* Kdl não é tipada, as anotações de tipos são descartáveis?
-  * Ou seja, de qqr Ann, só o que importa é o nome da var?
-  * Funcões e ctrs que recebem um Type como arg (ex.: Head e Cons), não teriam mais esse arg?
-* Kdl tem provas? Se não, não precisa de nenhum dos auxiliares de provas (Equal, Refl, Rewrite)
 * O que são:
   * Met
   * Ask
   * App
+* Colocar alguma identação nos cases de funções?
+  * Numa nota mais genérica: O quanto se preocupar com estética do código gerado, if at all
+* Veio um print de '$' no Term.Show.Go de Use. Seria isso um erro nos Term.Show?
+
+## Dúvidas relacionadas a arrancar código inútil/repetido
+
+* Não precisa dos Types?
+  * Exemplo: Terá os construtores $(Zero) e $(Succ n), mas não terá um $(Nat)?
+  * As coisas que printam tipos primitivos (Type e U32) podem só ser purgadas?
+* Kdl tem provas? Se não, não precisa compilar as ferramentas de provas (Equal, Refl, Rewrite)
+* Kdl não é tipada, as anotações de tipos são descartáveis?
+  * Ou seja, de qqr Ann, só o que importa é o nome da var?
+  * Funções e Ctrs que recebem um Type como arg (ex.: Head e Cons), não teriam mais esse arg?
+* Operações binárias em números (+ - * / etc) não usam nenhum simbolo exotérico né?
+  * AKA mesmo na compilação, pode continuar usando os Oper.Show.Go antigos
