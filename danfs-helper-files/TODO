@@ -4,6 +4,7 @@
   * Exemplo: Terá os construtores $(Zero) e $(Succ n), mas não terá um $(Nat)
 * Como são feitos Lambdas em Kind2?
 * Initial State de todas as funções seria #0?
+* Colocar alguma identação nos cases de funções?
 * Kdl não é tipada, as anotações de tipos são descartáveis?
   * Ou seja, de qqr Ann, só o que importa é o nome da var?
 * Kdl tem provas? Se não, não precisa de nenhum dos auxiliares de provas (Equal, Refl, Rewrite)

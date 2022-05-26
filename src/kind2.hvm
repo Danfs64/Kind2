@@ -1789,10 +1789,12 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go (Var name) file) =
     λx((String.Show.Go (Name.GetString name))
       x)
-//   (Term.Compile.Go (Use name uses) file) =
-//     λx((String.Show.Go "$")
-//       ((String.Show.Go (Name.GetString name))
-//       x))
+  (Term.Compile.Go (Use name uses) file) =
+    λx
+      // ((String.Show.Go "$")
+      ((String.Show.Go (Name.GetString name))
+      x)
+      // )
 //   (Term.Compile.Go (Met hash) file) =
 //     λx((String.Show.Go "_")
 //       ((String.Show.Go (U32.Show hash))
@@ -1856,11 +1858,12 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 //       ((String.Show.Go ")")
 //       x)))))
   (Term.Compile.Go (Cts ctid args) file) =
-    λx((String.Show.Go "(")
+    λx((Term.Compile.Go.CtrPrefix ctid file)
+      ((String.Show.Go "(")
       ((Term.Compile.Go.CtrName ctid file)
       ((Term.Compile.Go.Cts.Args args file)
       ((String.Show.Go ")")
-      x))))
+      x)))))
 //   (Term.Compile.Go (Eql val0 val1) file) =
 //     λx((Term.Compile.Go val0 file)
 //       ((String.Show.Go " == ")
@@ -1880,6 +1883,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 //       ((String.Show.Go " ")
 //       ((Term.Compile.Go expr file)
 //       x))))))))
+  (Term.Compile.Go.CtrPrefix ctid file) =
+    let pref = (U32.If (File.IsCtr file ctid) "$" "!")
+    λx((String.Show.Go pref) x)
   (Term.Compile.Go.CtrName id file) =
     (Maybe.Case (File.IdToName file id)
       (String.Show.Go (U32.Show id))
@@ -1937,42 +1943,38 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
   // If a Func has no rules, per File.IsCtr, it is a Constructor
   (File.Compile.Go (Cons (Func lhs.t lhs.r End) funs) file) =
-    λz((String.Show.Go "$")
-      ((Term.Compile.Go lhs.t file)
+    λz((Term.Compile.Go lhs.t file)
       // ((String.Show.Go " : ")
       // ((Term.Compile.Go lhs.r file)
       // ((String.Show.Go NewLine)
       // ((Rules.Compile.Go rules file)
       ((String.Show.Go NewLine)
       ((File.Compile.Go funs file)
-      z))))
+      z)))
       // ))))
 
   (File.Compile.Go (Cons (Func lhs.t lhs.r rules) funs) file) =
-    λz((String.Show.Go "!")
-      ((Term.Compile.Go lhs.t file)
+    λz((Term.Compile.Go lhs.t file)
       // ((String.Show.Go " : ")
       // ((Term.Compile.Go lhs.r file)
       ((String.Show.Go " {")
       ((String.Show.Go NewLine)
       ((Rules.Compile.Go rules file)
-      ((String.Show.Go NewLine)
       ((String.Show.Go "} = #0")
+      ((String.Show.Go NewLine)
       ((File.Compile.Go funs file)
-      z))))))))
+      z)))))))
       // ))
 
   (Rules.Compile.Go End file) =
     λx(x)
-  // TODO Checar se as coisas do lhs/rhs são ctr ou func, pra colocar os $ e !
   (Rules.Compile.Go (Rule lhs rhs rules) file) =
-    λx((String.Show.Go "!")
-      ((Term.Compile.Go lhs file)
+    λx((Term.Compile.Go lhs file)
       ((String.Show.Go " = ")
       ((Term.Compile.Go rhs file)
       ((String.Show.Go NewLine)
       ((Rules.Compile.Go rules file)
-      x))))))
+      x)))))
 
 // (U32.Show U32) : String
 // (U32.Show n) = (U32.ShowBuild n StrNil)
@@ -2155,13 +2157,17 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (Bool.Not b:Bool) : Bool
       (Bool.Not True)  = False
       (Bool.Not False) = True
+
+    // Identity
+    (Id t:Type a:t) : t
+    (Id t a) = a
   "
 
   // let file = (GetFile (File.Read code))
   // let func = (GetMaybe (File.NameToFunc file "Succ"))
   // func
   // let term = (Rule.LHS (Func.GetRules func))
-  // (Term.Compile file term)
+  // [term, (Term.Compile file term)]
 
   (Kind2.CompileKDL code)
   // (File.Show file)
