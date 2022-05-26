@@ -1979,17 +1979,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Rules.Compile.Go rules file)
       x)))))
 
-// (U32.Show U32) : String
-// (U32.Show n) = (U32.ShowBuild n StrNil)
-//   (U32.ShowBuild n str) = 
-//     let next = (StrCons (+ 48 (% n 10)) str)
-//     ((U32.If (< n 10) λx(x) λx(U32.ShowBuild (/ n 10) x)) next)
-
-// (U32.Read String) : U32
-// (U32.Read str) = (U32.Read.Go str 0)
-//   (U32.Read.Go StrNil         r) = r
-//   (U32.Read.Go (StrCons x xs) r) = (U32.If (& (<= '0' x) (<= x '9')) (U32.Read.Go xs (+ (* r 10) (- x '0'))) 0)
-
 
 // #############################################################################
 // # Tests                                                                     #
