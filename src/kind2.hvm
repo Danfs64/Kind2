@@ -1937,6 +1937,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λz((File.Compile.Go funs file)
       z)
 
+  // Declarations of types (e.g. Bool : Type) are not to be compiled, only their constructors
+  (File.Compile.Go (Cons (Func lhs.t Typ rules) funs) file) =
+    λz((File.Compile.Go funs file)
+      z)
+
   // If a Func has no rules, per File.IsCtr, it is a Constructor
   (File.Compile.Go (Cons (Func lhs.t lhs.r End) funs) file) =
     λz((Term.Compile.Go lhs.t file)
