@@ -2,24 +2,28 @@
 
 ## Dúvidas Gerais
 
-* HVM-KDL tem Let?
 * Como são feitos Lambdas em Kind2?
   * Eu tentei e tomei um parser error :c
 * Initial State de todas as funções seria #0?
+  * Mais especificamente, como induziria, a partir do código Kind2, o Initial State de uma função?
 * O que são:
-  * Met
   * App
+* Holes podem ser ignorados? Com ignorados pode-se entender either:
+  1. Não precisa existir checagem pra compilar Hole, pois nunca existirá no compilado
+  2. Ativamente checar se existe um hole na função e, se tiver, não compilar a função
 * Veio um print de '$' no Term.Show.Go de Use. Seria isso um erro nos Term.Show?
 
 ## Dúvidas relacionadas a arrancar código inútil/repetido
 
 * As coisas que printam tipos primitivos (Type e U32) podem só ser purgadas?
-* Kdl não é tipada, as anotações de tipos são descartáveis?
-  * Ou seja, de qqr Ann, só o que importa é o nome da var?
-  * Funções e Ctrs que recebem um Type como arg (ex.: Head e Cons), não teriam mais esse arg?
+* Kdl não é tipada, mas talvez faça sentido ter construtores pros tipos?
+  * Ex.: Funções/Ctrs que recebam um Type como arg, que não seja pra tipar outros args?
 * Operações binárias em números (+ - * / etc) não usam nenhum simbolo exotérico né?
   * AKA mesmo na compilação, pode continuar usando os Oper.Show.Go antigos
+  * Seria mais interessante criar versões "Compile" iguais, pra caso algum dia tenha q mudar?
 
 ## TODO
 
 * Colocar alguma identação nos cases de funções
+* Lidar com o fato que precisa substituir aonde o name de um `let` é usada pelo seu corpo
+  * Se o name é usado múltiplas vezes, tem que fazer `dup` também

@@ -1802,10 +1802,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((String.Show.Go (Name.GetString name))
       x)
       // )
-//   (Term.Compile.Go (Met hash) file) =
-//     λx((String.Show.Go "_")
-//       ((String.Show.Go (U32.Show hash))
-//       x))
+  (Term.Compile.Go (Met hash) file) =
+    λx((String.Show.Go "_")
+      ((String.Show.Go (U32.Show hash))
+      x))
 //   (Term.Compile.Go (Let name expr body) file) =
 //     λx((String.Show.Go "let ")
 //       ((String.Show.Go (Name.GetString name))
@@ -1956,8 +1956,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Rules.Compile.Go rules file)
       ((String.Show.Go "} = #0")
       ((String.Show.Go NewLine)
+      ((String.Show.Go NewLine)
       ((File.Compile.Go funs file)
-      z)))))))
+      z))))))))
 
   (Rules.Compile.Go End file) =
     λx(x)
