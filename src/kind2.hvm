@@ -1797,11 +1797,8 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx((String.Show.Go (Name.GetString name))
       x)
   (Term.Compile.Go (Use name uses) file) =
-    λx
-      // ((String.Show.Go "$")
-      ((String.Show.Go (Name.GetString name))
+    λx((String.Show.Go (Name.GetString name))
       x)
-      // )
   (Term.Compile.Go (Met hash) file) =
     λx((String.Show.Go "_")
       ((String.Show.Go (U32.Show hash))
@@ -1820,9 +1817,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go Typ file) =
     λx((String.Show.Go "Type")
       x)
-  // (Term.Compile.Go U32 file) =
-  //   λx((String.Show.Go "U32")
-  //     x)
+  (Term.Compile.Go U32 file) =
+    λx((String.Show.Go "U32")
+      x)
   (Term.Compile.Go (N32 numb) file) =
     λx((String.Show.Go "#")
       ((String.Show.Go (U32.Show numb))
@@ -1840,6 +1837,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 //     λx((String.Show.Go "?")
 //       ((String.Show.Go name)
 //       x))
+//   TODO Conferir se isso aqui é só pra assinatura mesmo (se for, não precisa compilar -> vira @x(x))
 //   (Term.Compile.Go (All name type body) file) =
 //     λx((String.Show.Go "∀(")
 //       ((String.Show.Go (Name.GetString name))
@@ -1848,19 +1846,21 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 //       ((String.Show.Go ") ")
 //       ((Term.Compile.Go body file)
 //       x))))))
-//   (Term.Compile.Go (Lam name body) file) =
-//     λx((String.Show.Go "λ")
-//       ((String.Show.Go (Name.GetString name))
-//       ((String.Show.Go " ")
-//       ((Term.Compile.Go body file)
-//       x))))
-//   (Term.Compile.Go (App func argm) file) =
-//     λx((String.Show.Go "(")
-//       ((Term.Compile.Go func file)
-//       ((String.Show.Go " ")
-//       ((Term.Compile.Go argm file)
-//       ((String.Show.Go ")")
-//       x)))))
+  // TODO Checar se o lambda é usado no body. Se não, substituir name por ~
+  (Term.Compile.Go (Lam name body) file) =
+    λx((String.Show.Go "@")
+      ((String.Show.Go (Name.GetString name))
+      ((String.Show.Go " ")
+      ((Term.Compile.Go body file)
+      x))))
+  // TODO Descobrir se é desse jeito trivial mesmo em KDL-HVM
+  (Term.Compile.Go (App func argm) file) =
+    λx((String.Show.Go "(")
+      ((Term.Compile.Go func file)
+      ((String.Show.Go " ")
+      ((Term.Compile.Go argm file)
+      ((String.Show.Go ")")
+      x)))))
   (Term.Compile.Go (Cts ctid args) file) =
     λx((Term.Compile.Go.CtrPrefix ctid file)
       ((String.Show.Go "(")
@@ -2168,6 +2168,15 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (List.Head t:Type x:(List t)) : t
       (List.Head t (Cons t x xs)) = x
 
+    // Map a function through a list
+    (List.Map t:Type u:Type f:∀(x:t)u xs:(List t)) : (List u)
+      (List.Map t u f Nil)         = Nil
+      (List.Map t u f (Cons x xs)) = (Cons (f x) (List.Map t u f xs))
+
+    // Doubles all values for a list of Nats
+    (List.DoubleNat xs:(List Nat)) : (List Nat)
+      (List.DoubleNat xs) = (List.Map Nat Nat Nat.Double xs)
+
     Foo : Nat
       Foo = (Nat.Destroy (Nat.Pow2
         (Succ (Succ (Succ (Succ (Succ (Succ (Succ
@@ -2180,7 +2189,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (Bar x) = 20
 
     Main : U32
-      Main = (* (+ (Bar 1) 1) 2)
+      Main = (List.Map Nat (List Nat) λx(Cons x Nil) Nil)
       // Main =
       //   let a = (* (+ (Bar 1) 1) 2)
       //   a
