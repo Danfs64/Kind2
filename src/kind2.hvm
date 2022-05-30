@@ -1846,10 +1846,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 //       ((String.Show.Go ") ")
 //       ((Term.Compile.Go body file)
 //       x))))))
-  // TODO Checar se o lambda é usado no body. Se não, substituir name por ~
+  // TODO Talvez colocar o body entre parenteses aqui (body do tipo U32 compila sem parenteses)
   (Term.Compile.Go (Lam name body) file) =
     λx((String.Show.Go "@")
-      ((String.Show.Go (Name.GetString name))
+      ((Term.Compile.Go.LamName (Lam name body))
       ((String.Show.Go " ")
       ((Term.Compile.Go body file)
       x))))
@@ -1888,6 +1888,17 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Term.Compile.Go arg file)
       ((Term.Compile.Go.Cts.Args args file)
       x)))
+  (Term.Compile.Go.LamName (Lam name body)) =
+    let count = (Uses name body)
+    (Term.Compile.Go.LamName.aux count name)
+
+    (Term.Compile.Go.LamName.aux 0 name) =
+      λx((String.Show.Go "~")
+        x)
+    (Term.Compile.Go.LamName.aux n name) =
+      λx((String.Show.Go (Name.GetString name))
+        x)
+
   (String.Show.Go xs) =
     λx(String.Concat xs x)
 
@@ -1953,22 +1964,23 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λz((Term.Compile.Go lhs.t file)
       ((String.Show.Go " {")
       ((String.Show.Go NewLine)
-      ((Rules.Compile.Go rules file)
+      ((Rules.Compile.Go rules file "  ")
       ((String.Show.Go "} = #0")
       ((String.Show.Go NewLine)
       ((String.Show.Go NewLine)
       ((File.Compile.Go funs file)
       z))))))))
 
-  (Rules.Compile.Go End file) =
+  (Rules.Compile.Go End file ident) =
     λx(x)
-  (Rules.Compile.Go (Rule lhs rhs rules) file) =
-    λx((Term.Compile.Go lhs file)
+  (Rules.Compile.Go (Rule lhs rhs rules) file ident) =
+    λx((String.Show.Go ident)
+      ((Term.Compile.Go lhs file)
       ((String.Show.Go " = ")
       ((Term.Compile.Go rhs file)
       ((String.Show.Go NewLine)
-      ((Rules.Compile.Go rules file)
-      x)))))
+      ((Rules.Compile.Go rules file ident)
+      x))))))
 
 
 // #############################################################################
@@ -2189,16 +2201,16 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (Bar x) = 20
 
     Main : U32
-      Main = (List.Map Nat (List Nat) λx(Cons x Nil) Nil)
+      Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
       // Main =
       //   let a = (* (+ (Bar 1) 1) 2)
       //   a
   "
 
   // let file = (GetFile (File.Read code))
-  // let func = (GetMaybe (File.NameToFunc file "Bool.DNT"))
+  // let func = (GetMaybe (File.NameToFunc file "Main"))
   // func
-  // let term = (Rule.LHS (Func.GetRules func))
+  // let term = (Rule.RHS (Func.GetRules func))
   // [term, (Term.Compile file term)]
 
   (Kind2.CompileKDL code)

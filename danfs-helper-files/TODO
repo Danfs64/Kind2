@@ -19,10 +19,12 @@
   * Ex.: Funções/Ctrs que recebam um Type como arg, que não seja pra tipar outros args?
 * Operações binárias em números (+ - * / etc) não usam nenhum simbolo exotérico né?
   * AKA mesmo na compilação, pode continuar usando os Oper.Show.Go antigos
-  * Seria mais interessante criar versões "Compile" iguais, pra caso algum dia tenha q mudar?
+    * Seria interessante criar versões "Compile", mesmo que iguais, caso algum dia tenha q mudar?
+* Context é algo que só é pertinente no Type Checking, né?
+  * AKA não precisa existir um código de Context.Compile
 
 ## TODO
 
-* Colocar alguma identação nos cases de funções
 * Lidar com o fato que precisa substituir aonde o name de um `let` é usada pelo seu corpo
   * Se o name é usado múltiplas vezes, tem que fazer `dup` também
+    * Colocar os dups em uma linha própria cada um, usando mais um nível de ident
