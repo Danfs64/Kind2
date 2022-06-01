@@ -1826,17 +1826,16 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       x))
   (Term.Compile.Go (O32 oper val0 val1) file) =
     λx((String.Show.Go "(")
-      ((Oper.Show.Go oper)
+      ((Oper.Compile.Go oper)
       ((String.Show.Go " ")
       ((Term.Compile.Go val0 file)
       ((String.Show.Go " ")
       ((Term.Compile.Go val1 file)
       ((String.Show.Go ")")
       x)))))))
-//   (Term.Compile.Go (Hol name) file) =
-//     λx((String.Show.Go "?")
-//       ((String.Show.Go name)
-//       x))
+  // TODO Talvez fazer nem compilar se achar um hole
+  (Term.Compile.Go (Hol name) file) =
+    λx(x)
 //   TODO Conferir se isso aqui é só pra assinatura mesmo (se for, não precisa compilar -> vira @x(x))
 //   (Term.Compile.Go (All name type body) file) =
 //     λx((String.Show.Go "∀(")
@@ -1853,7 +1852,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((String.Show.Go " ")
       ((Term.Compile.Go body file)
       x))))
-  // TODO Descobrir se é desse jeito trivial mesmo em KDL-HVM
   (Term.Compile.Go (App func argm) file) =
     λx((String.Show.Go "(")
       ((Term.Compile.Go func file)
@@ -1902,42 +1900,23 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (String.Show.Go xs) =
     λx(String.Concat xs x)
 
-//   (Oper.Show.Go ADD) = (String.Show.Go "+")
-//   (Oper.Show.Go SUB) = (String.Show.Go "-")
-//   (Oper.Show.Go MUL) = (String.Show.Go "*")
-//   (Oper.Show.Go DIV) = (String.Show.Go "/")
-//   (Oper.Show.Go MOD) = (String.Show.Go "%")
-//   (Oper.Show.Go AND) = (String.Show.Go "&")
-//   (Oper.Show.Go OR)  = (String.Show.Go "|")
-//   (Oper.Show.Go XOR) = (String.Show.Go "^")
-//   (Oper.Show.Go SHL) = (String.Show.Go "<<")
-//   (Oper.Show.Go SHR) = (String.Show.Go ">>")
-//   (Oper.Show.Go LTN) = (String.Show.Go "<")
-//   (Oper.Show.Go LTE) = (String.Show.Go "<=")
-//   (Oper.Show.Go EQL) = (String.Show.Go "==")
-//   (Oper.Show.Go GTE) = (String.Show.Go ">=")
-//   (Oper.Show.Go GTN) = (String.Show.Go ">")
-//   (Oper.Show.Go NEQ) = (String.Show.Go "!=")
+  (Oper.Compile.Go ADD) = (String.Show.Go "+")
+  (Oper.Compile.Go SUB) = (String.Show.Go "-")
+  (Oper.Compile.Go MUL) = (String.Show.Go "*")
+  (Oper.Compile.Go DIV) = (String.Show.Go "/")
+  (Oper.Compile.Go MOD) = (String.Show.Go "%")
+  (Oper.Compile.Go AND) = (String.Show.Go "&")
+  (Oper.Compile.Go OR)  = (String.Show.Go "|")
+  (Oper.Compile.Go XOR) = (String.Show.Go "^")
+  (Oper.Compile.Go SHL) = (String.Show.Go "<<")
+  (Oper.Compile.Go SHR) = (String.Show.Go ">>")
+  (Oper.Compile.Go LTN) = (String.Show.Go "<")
+  (Oper.Compile.Go LTE) = (String.Show.Go "<=")
+  (Oper.Compile.Go EQL) = (String.Show.Go "==")
+  (Oper.Compile.Go GTE) = (String.Show.Go ">=")
+  (Oper.Compile.Go GTN) = (String.Show.Go ">")
+  (Oper.Compile.Go NEQ) = (String.Show.Go "!=")
 
-// (Context.Show Nil file) = ""
-// (Context.Show ctx file) =
-//   let ctx = (List.Reverse ctx)
-//   let build = λz
-//     ((String.Show.Go "Context:")
-//     ((String.Show.Go NewLine)
-//     ((Context.Show.Go ctx file)
-//       z)))
-//   (build "")
-
-//   (Context.Show.Go Nil file) = λz(z)
-//   (Context.Show.Go (Cons (Pair name type) rest) file) =
-//     λz((String.Show.Go "- ")
-//       ((String.Show.Go (Name.GetString name))
-//       ((String.Show.Go " : ") 
-//       ((Term.Compile.Go type file)
-//       ((String.Show.Go NewLine)
-//       ((Context.Show.Go rest file)
-//       z))))))
 
 (File.Compile file) = ((File.Compile.Go (Array.ToList (File.GetFuncs file)) file) "")
   (File.Compile.Go Nil file) =
@@ -1948,10 +1927,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λz((File.Compile.Go funs file)
       z)
 
-  // Declarations of types (e.g. Bool : Type) are not to be compiled, only their constructors
-  (File.Compile.Go (Cons (Func lhs.t Typ rules) funs) file) =
-    λz((File.Compile.Go funs file)
-      z)
+  // // Declarations of types (e.g. Bool : Type) are not to be compiled, only their constructors
+  // (File.Compile.Go (Cons (Func lhs.t Typ rules) funs) file) =
+  //   λz((File.Compile.Go funs file)
+  //     z)
 
   // If a Func has no rules, per File.IsCtr, it is a Constructor
   (File.Compile.Go (Cons (Func lhs.t lhs.r End) funs) file) =
@@ -2102,6 +2081,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     Main = refl Zero
 "
 
+(File.NameToFunc file name) = (File.NameToFunc.Go file (File.NameToId file name))
+  (File.NameToFunc.Go file (None   )) = None
+  (File.NameToFunc.Go file (Some id)) = (Pair.Snd (File.GotFunc file id))
+
 (Kind2.Check code) = (Kind2.Check.Go (File.Read code))
   (Kind2.Check.Go (Er err))  = err
   (Kind2.Check.Go (Ok file)) = (Verify.File file)
@@ -2114,9 +2097,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Kind2.CompileKDL.Go (Er err )) = err
   (Kind2.CompileKDL.Go (Ok file)) = (File.Compile file)
 
-// (Main n) = (Kind2.Check Test.0)
-// (Main n) = (Kind2.Run Test.0)
-
 (GetFile  (Ok   f)) = f
 (GetMaybe (Some x)) = x
 
@@ -2124,9 +2104,8 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 (Rule.RHS  (Rule lhs rhs xs)) = rhs
 (Rule.Next (Rule lhs rhs xs)) = xs
 
-(File.NameToFunc file name) = (File.NameToFunc.Go file (File.NameToId file name))
-  (File.NameToFunc.Go file (None   )) = None
-  (File.NameToFunc.Go file (Some id)) = (Pair.Snd (File.GotFunc file id))
+// (Main n) = (Kind2.Check Test.0)
+// (Main n) = (Kind2.Run Test.0)
 
 (Main) =
   let code = "
