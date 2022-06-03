@@ -1792,18 +1792,18 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     x))
 
 // (Term.Compile term:Term file:File) : String
-(Term.Compile file term) = ((Term.Compile.Go term file) "")
-  (Term.Compile.Go (Var name) file) =
+(Term.Compile file term) = ((Term.Compile.Go term file "") "")
+  (Term.Compile.Go (Var name) file ident) =
     λx((String.Show.Go (Name.GetString name))
       x)
-  (Term.Compile.Go (Use name uses) file) =
+  (Term.Compile.Go (Use name uses) file ident) =
     λx((Term.Compile.Go.VarName uses name)
       x)
-  (Term.Compile.Go (Met hash) file) =
+  (Term.Compile.Go (Met hash) file ident) =
     λx((String.Show.Go "_")
       ((String.Show.Go (U32.Show hash))
       x))
-//   (Term.Compile.Go (Let name expr body) file) =
+//   (Term.Compile.Go (Let name expr body) file ident) =
 //     λx((String.Show.Go "let ")
 //       ((String.Show.Go (Name.GetString name))
 //       ((String.Show.Go " = ")
@@ -1811,58 +1811,58 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 //       ((String.Show.Go "; ")
 //       ((Term.Compile.Go body file)
 //       x))))))
-  (Term.Compile.Go (Ann xval xtyp) file) =
-    λx((Term.Compile.Go xval file)
+  (Term.Compile.Go (Ann xval xtyp) file ident) =
+    λx((Term.Compile.Go xval file "")
       x)
-  (Term.Compile.Go Typ file) =
+  (Term.Compile.Go Typ file ident) =
     λx((String.Show.Go "Type")
       x)
-  (Term.Compile.Go U32 file) =
+  (Term.Compile.Go U32 file ident) =
     λx((String.Show.Go "U32")
       x)
-  (Term.Compile.Go (N32 numb) file) =
+  (Term.Compile.Go (N32 numb) file ident) =
     λx((String.Show.Go "#")
       ((String.Show.Go (U32.Show numb))
       x))
-  (Term.Compile.Go (O32 oper val0 val1) file) =
+  (Term.Compile.Go (O32 oper val0 val1) file ident) =
     λx((String.Show.Go "(")
       ((Oper.Compile.Go oper)
       ((String.Show.Go " ")
-      ((Term.Compile.Go val0 file)
+      ((Term.Compile.Go val0 file "")
       ((String.Show.Go " ")
-      ((Term.Compile.Go val1 file)
+      ((Term.Compile.Go val1 file "")
       ((String.Show.Go ")")
       x)))))))
-  (Term.Compile.Go (Hol name) file) =
+  (Term.Compile.Go (Hol name) file ident) =
     λx(x)
-  (Term.Compile.Go (All name type body) file) =
+  (Term.Compile.Go (All name type body) file ident) =
     λx(x)
   // TODO Talvez colocar o body entre parenteses aqui (body do tipo U32 compila sem parenteses)
-  (Term.Compile.Go (Lam name body) file) =
+  (Term.Compile.Go (Lam name body) file ident) =
     λx((String.Show.Go "@")
       ((Term.Compile.Go.LamName (Lam name body))
       ((String.Show.Go " ")
-      ((Term.Compile.Go body file)
+      ((Term.Compile.Go body file "")
       x))))
-  (Term.Compile.Go (App func argm) file) =
+  (Term.Compile.Go (App func argm) file ident) =
     λx((String.Show.Go "(")
-      ((Term.Compile.Go func file)
+      ((Term.Compile.Go func file "")
       ((String.Show.Go " ")
-      ((Term.Compile.Go argm file)
+      ((Term.Compile.Go argm file "")
       ((String.Show.Go ")")
       x)))))
-  (Term.Compile.Go (Cts ctid args) file) =
+  (Term.Compile.Go (Cts ctid args) file ident) =
     λx((Term.Compile.Go.CtrPrefix ctid file)
       ((String.Show.Go "(")
       ((Term.Compile.Go.CtrName ctid file)
       ((Term.Compile.Go.Cts.Args args file)
       ((String.Show.Go ")")
       x)))))
-  (Term.Compile.Go (Eql val0 val1) file) =
+  (Term.Compile.Go (Eql val0 val1) file ident) =
     λx(x)
-  (Term.Compile.Go (Rfl expr) file) =
+  (Term.Compile.Go (Rfl expr) file ident) =
     λx(x)
-  (Term.Compile.Go (Rwt name witn goal expr) file) =
+  (Term.Compile.Go (Rwt name witn goal expr) file ident) =
     λx(x)
 
   (Term.Compile.Go.CtrPrefix ctid file) =
@@ -1876,7 +1876,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx(x)
   (Term.Compile.Go.Cts.Args (Cons arg args) file) =
     λx((String.Show.Go " ")
-      ((Term.Compile.Go arg file)
+      ((Term.Compile.Go arg file "")
       ((Term.Compile.Go.Cts.Args args file)
       x)))
 
@@ -1928,14 +1928,14 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
   // If a Func has no rules, per File.IsCtr, it is a Constructor
   (File.Compile.Go (Cons (Func lhs.t lhs.r End) funs) file) =
-    λz((Term.Compile.Go lhs.t file)
+    λz((Term.Compile.Go lhs.t file "")
       ((String.Show.Go NewLine)
       ((File.Compile.Go funs file)
       z)))
 
   // Otherwise, it is a Function
   (File.Compile.Go (Cons (Func lhs.t lhs.r rules) funs) file) =
-    λz((Term.Compile.Go lhs.t file)
+    λz((Term.Compile.Go lhs.t file "")
       ((String.Show.Go " {")
       ((String.Show.Go NewLine)
       ((Rules.Compile.Go rules file "  ")
@@ -1949,9 +1949,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx(x)
   (Rules.Compile.Go (Rule lhs rhs rules) file ident) =
     λx((String.Show.Go ident)
-      ((Term.Compile.Go lhs file)
+      ((Term.Compile.Go lhs file "")
       ((String.Show.Go " = ")
-      ((Term.Compile.Go rhs file)
+      ((Term.Compile.Go rhs file "")
       ((String.Show.Go NewLine)
       ((Rules.Compile.Go rules file ident)
       x))))))
