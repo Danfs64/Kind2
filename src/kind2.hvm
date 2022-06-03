@@ -1803,14 +1803,26 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx((String.Show.Go "_")
       ((String.Show.Go (U32.Show hash))
       x))
-//   (Term.Compile.Go (Let name expr body) file ident) =
-//     λx((String.Show.Go "let ")
-//       ((String.Show.Go (Name.GetString name))
-//       ((String.Show.Go " = ")
-//       ((Term.Compile.Go expr file)
-//       ((String.Show.Go "; ")
-//       ((Term.Compile.Go body file)
-//       x))))))
+  (Term.Compile.Go (Let name expr body) file ident) =
+    (Term.Compile.Go.aux (Uses name body) (Let name expr body) file ident)
+    
+    (Term.Compile.Go.aux 0 (Let name expr body) file ident) =
+      λx((Term.Compile.Go body file ident)
+        x)
+    (Term.Compile.Go.aux n (Let name expr body) file ident) =
+      λx(
+        // (String.Show.Go NewLine)
+        // ((String.Show.Go nxt_ident)
+        ((String.Show.Go "let ")
+        ((String.Show.Go (Name.GetString name))
+        ((String.Show.Go " = ")
+        ((Term.Compile.Go expr file ident)
+        ((String.Show.Go ";")
+        ((String.Show.Go NewLine)
+        ((String.Show.Go ident)
+        ((Term.Compile.Go body file ident)
+        x)))))))))
+        // )
   (Term.Compile.Go (Ann xval xtyp) file ident) =
     λx((Term.Compile.Go xval file "")
       x)
@@ -1917,7 +1929,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λz(z)
 
   // Funcs that return an Equal (Eql) are theorems, and should not be compiled
-  (File.Compile.Go (Cons (Func lhs.t (Eql val0 val1) rules) funs) file) =
+  (File.Compile.Go (Cons (Func lhs.t (Eql _ _) rules) funs) file) =
     λz((File.Compile.Go funs file)
       z)
 
@@ -1948,10 +1960,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Rules.Compile.Go End file ident) =
     λx(x)
   (Rules.Compile.Go (Rule lhs rhs rules) file ident) =
+    let nxt_ident = (String.Concat "  " ident)
     λx((String.Show.Go ident)
-      ((Term.Compile.Go lhs file "")
+      ((Term.Compile.Go lhs file ident)
       ((String.Show.Go " = ")
-      ((Term.Compile.Go rhs file "")
+      ((Term.Compile.Go rhs file nxt_ident)
       ((String.Show.Go NewLine)
       ((Rules.Compile.Go rules file ident)
       x))))))
@@ -2196,10 +2209,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (Bar x) = 20
 
     Main : U32
-      Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
-      // Main =
-      //   let a = (* (+ (Bar 1) 1) 2)
-      //   a
+      // Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
+      Main =
+        let a = (* (+ (Bar 1) 1) 2)
+        a
   "
 
   // let file = (GetFile (File.Read code))

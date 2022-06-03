@@ -17,5 +17,4 @@
 * Variáveis usadas múltiplas vezes precisam ser `dup`adas
   * Colocar os dups em uma linha própria cada um, usando mais um nível de ident
 * Lidar com o fato que precisa substituir aonde o name de um `let` é usada pelo seu corpo
-  * Não compilar `let`s não usados
   * Se o name é usado múltiplas vezes, tem que fazer `dup`
