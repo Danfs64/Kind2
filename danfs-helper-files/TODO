@@ -12,10 +12,8 @@
 
 ## TODO
 
-* O negócio de var não usada ser `~` não é só pra lambda, é o código inteiro
 * Como definir o Initial State de uma Função?
   * Proposta do Kelvin: Para toda função `foo`, existir um `foo.state` de aridade 0 declarando o initial state
-* Não compilar arquivos que tenham `Hole`s
 * Variáveis usadas múltiplas vezes precisam ser `dup`adas
   * Colocar os dups em uma linha própria cada um, usando mais um nível de ident
 * Lidar com o fato que precisa substituir aonde o name de um `let` é usada pelo seu corpo

@@ -1797,7 +1797,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx((String.Show.Go (Name.GetString name))
       x)
   (Term.Compile.Go (Use name uses) file) =
-    λx((String.Show.Go (Name.GetString name))
+    λx((Term.Compile.Go.VarName uses name)
       x)
   (Term.Compile.Go (Met hash) file) =
     λx((String.Show.Go "_")
@@ -1833,7 +1833,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Term.Compile.Go val1 file)
       ((String.Show.Go ")")
       x)))))))
-  // TODO Talvez fazer nem compilar se achar um hole
   (Term.Compile.Go (Hol name) file) =
     λx(x)
   (Term.Compile.Go (All name type body) file) =
@@ -1865,6 +1864,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx(x)
   (Term.Compile.Go (Rwt name witn goal expr) file) =
     λx(x)
+
   (Term.Compile.Go.CtrPrefix ctid file) =
     let pref = (U32.If (File.IsCtr file ctid) "$" "!")
     λx((String.Show.Go pref) x)
@@ -1879,14 +1879,15 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Term.Compile.Go arg file)
       ((Term.Compile.Go.Cts.Args args file)
       x)))
-  (Term.Compile.Go.LamName (Lam name body)) =
-    let count = (Uses name body)
-    (Term.Compile.Go.LamName.aux count name)
 
-    (Term.Compile.Go.LamName.aux 0 name) =
+  (Term.Compile.Go.LamName (Lam name body)) =
+    let uses = (Uses name body)
+    (Term.Compile.Go.VarName uses name)
+
+    (Term.Compile.Go.VarName 0 name) =
       λx((String.Show.Go "~")
         x)
-    (Term.Compile.Go.LamName.aux n name) =
+    (Term.Compile.Go.VarName n name) =
       λx((String.Show.Go (Name.GetString name))
         x)
 
@@ -1954,6 +1955,22 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((String.Show.Go NewLine)
       ((Rules.Compile.Go rules file ident)
       x))))))
+
+
+// TODO This looks unefficient, there should be a better way
+(File.FindHol file) = (File.FindHol.Go (Array.ToList (File.GetFuncs file)))
+  (File.FindHol.Go (Nil            )) = 0
+  (File.FindHol.Go (Cons func funcs)) =
+    let count = (Func.FindHol func)
+    (File.FindHol.Go2 count funcs)
+
+    (File.FindHol.Go2 1 funcs) = 1
+    (File.FindHol.Go2 0 funcs) = (File.FindHol.Go funcs)
+
+(Func.FindHol (Func _ _ rules)) = (Rules.FindHol rules)
+(Rules.FindHol (End)) = 0
+(Rules.FindHol (Rule _ (Hol name) rules)) = 1
+(Rules.FindHol (Rule _ rhs        rules)) = (Rules.FindHol rules)
 
 
 // #############################################################################
@@ -2089,27 +2106,19 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
 (Kind2.CompileKDL code) = (Kind2.CompileKDL.Go (File.Read code))
   (Kind2.CompileKDL.Go (Er err )) = err
-  (Kind2.CompileKDL.Go (Ok file)) = (File.Compile file)
+  (Kind2.CompileKDL.Go (Ok file)) =
+    let has_hols = (File.FindHol file)
+    (Kind2.CompileKDL.Go2 has_hols file)
+
+    (Kind2.CompileKDL.Go2 1 file) = (Error "A file with Hols can't be compiled to KDL")
+    (Kind2.CompileKDL.Go2 0 file) = (File.Compile file)
 
 (GetFile  (Ok   f)) = f
 (GetMaybe (Some x)) = x
 
-(Rule.LHS  (Rule lhs rhs xs)) = lhs
-(Rule.RHS  (Rule lhs rhs xs)) = rhs
-(Rule.Next (Rule lhs rhs xs)) = xs
-
-(File.FindHol file) = (File.FindHol.Go (Array.ToList (File.GetFuncs file)))
-  (File.FindHol.Go (Nil            )) = 0
-  (File.FindHol.Go (Cons func funcs)) =
-    let count = (Func.FindHol func)
-    (File.FindHol.Go2 count funcs)
-      (File.FindHol.Go2 0 funcs) = (File.FindHol.Go funcs)
-      (File.FindHol.Go2 n funcs) = 1
-
-(Func.FindHol (Func lhs.t lhs.r rules)) = (Rules.FindHol rules)
-(Rules.FindHol (End                )) = 0
-(Rules.FindHol (Rules lhs (Hol name) rules)) = 1
-(Rules.FindHol (Rules lhs rhs        rules)) = (Rules.FindHol rules)
+(Rules.LHS  (Rule lhs rhs xs)) = lhs
+(Rules.RHS  (Rule lhs rhs xs)) = rhs
+(Rules.Next (Rule lhs rhs xs)) = xs
 
 // (Main n) = (Kind2.Check Test.0)
 // (Main n) = (Kind2.Run Test.0)
@@ -2193,12 +2202,12 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       //   a
   "
 
-  let file = (GetFile (File.Read code))
-  // let func = (GetMaybe (File.NameToFunc file "List.Map"))
+  // let file = (GetFile (File.Read code))
+  // let func = (GetMaybe (File.NameToFunc file "List.Head"))
   // func
-  // let term = (Rule.LHS (Func.GetRules func))
+  // let term = (Rules.LHS (Func.GetRules func))
   // [term, (Term.Compile file term)]
 
-  // (Kind2.CompileKDL code)
+  (Kind2.CompileKDL code)
   // (Kind2.CompileKDL Test.0)
-  (File.FindHol file)
+  // (File.Show file)
