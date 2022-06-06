@@ -1670,30 +1670,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go (Use name uses) file ident) =
     λx((Term.Compile.Go.VarName uses name)
       x)
-  (Term.Compile.Go (Met hash) file ident) =
-    λx((String.Show.Go "_")
-      ((String.Show.Go (U32.Show hash))
-      x))
+  (Term.Compile.Go (Hol hash) file ident) =
+    λx((String.Show.Go "~")
+      x)
   (Term.Compile.Go (Let name expr body) file ident) =
-    (Term.Compile.Go.aux (Uses name body) (Let name expr body) file ident)
-    
-    (Term.Compile.Go.aux 0 (Let name expr body) file ident) =
-      λx((Term.Compile.Go body file ident)
-        x)
-    (Term.Compile.Go.aux n (Let name expr body) file ident) =
-      λx(
-        // (String.Show.Go NewLine)
-        // ((String.Show.Go nxt_ident)
-        ((String.Show.Go "let ")
-        ((String.Show.Go (Name.GetString name))
-        ((String.Show.Go " = ")
-        ((Term.Compile.Go expr file ident)
-        ((String.Show.Go ";")
-        ((String.Show.Go NewLine)
-        ((String.Show.Go ident)
-        ((Term.Compile.Go body file ident)
-        x)))))))))
-        // )
+    (Term.Compile.Go.Let (Uses name body) (Let name expr body) file ident)
   (Term.Compile.Go (Ann xval xtyp) file ident) =
     λx((Term.Compile.Go xval file "")
       x)
@@ -1716,7 +1697,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Term.Compile.Go val1 file "")
       ((String.Show.Go ")")
       x)))))))
-  (Term.Compile.Go (Hol name) file ident) =
+  (Term.Compile.Go (Gol name) file ident) =
     λx(x)
   (Term.Compile.Go (All name type body) file ident) =
     λx(x)
@@ -1737,7 +1718,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go (Cts ctid args) file ident) =
     λx((Term.Compile.Go.CtrPrefix ctid file)
       ((String.Show.Go "(")
-      ((Term.Compile.Go.CtrName ctid file)
+      ((String.Show.Go (Name.GetString ctid))
       ((Term.Compile.Go.Cts.Args args file)
       ((String.Show.Go ")")
       x)))))
@@ -1748,13 +1729,23 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go (Rwt name witn goal expr) file ident) =
     λx(x)
 
+  (Term.Compile.Go.Let 0 (Let name expr body) file ident) =
+    λx((Term.Compile.Go body file ident)
+      x)
+  (Term.Compile.Go.Let n (Let name expr body) file ident) =
+    λx((String.Show.Go "let ")
+      ((String.Show.Go (Name.GetString name))
+      ((String.Show.Go " = ")
+      ((Term.Compile.Go expr file ident)
+      ((String.Show.Go ";")
+      ((String.Show.Go NewLine)
+      ((String.Show.Go ident)
+      ((Term.Compile.Go body file ident)
+      x))))))))
+
   (Term.Compile.Go.CtrPrefix ctid file) =
     let pref = (U32.If (File.IsCtr file ctid) "$" "!")
     λx((String.Show.Go pref) x)
-  (Term.Compile.Go.CtrName id file) =
-    (Maybe.Case (File.IdToName file id)
-      (String.Show.Go (U32.Show id))
-      λname (String.Show.Go name))
   (Term.Compile.Go.Cts.Args Nil file) =
     λx(x)
   (Term.Compile.Go.Cts.Args (Cons arg args) file) =
@@ -1795,7 +1786,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Oper.Compile.Go NEQ) = (String.Show.Go "!=")
 
 
-(File.Compile file) = ((File.Compile.Go (Array.ToList (File.GetFuncs file)) file) "")
+(File.Compile file) = ((File.Compile.Go (Map.Values (File.GetFuncs file)) file) "")
   (File.Compile.Go Nil file) =
     λz(z)
 
@@ -1842,19 +1833,20 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
 
 // TODO This looks unefficient, there should be a better way
-(File.FindHol file) = (File.FindHol.Go (Array.ToList (File.GetFuncs file)))
-  (File.FindHol.Go (Nil            )) = 0
-  (File.FindHol.Go (Cons func funcs)) =
-    let count = (Func.FindHol func)
-    (File.FindHol.Go2 count funcs)
+(File.FindGol file) = (File.FindGol.Go (Map.Values (File.GetFuncs file)))
+  (File.FindGol.Go (Nil            )) = 0
+  (File.FindGol.Go (Cons func funcs)) =
+    let count = (Func.FindGol func)
+    (File.FindGol.Go2 count funcs)
 
-    (File.FindHol.Go2 1 funcs) = 1
-    (File.FindHol.Go2 0 funcs) = (File.FindHol.Go funcs)
+    (File.FindGol.Go2 1 funcs) = 1
+    (File.FindGol.Go2 0 funcs) = (File.FindGol.Go funcs)
 
-(Func.FindHol (Func _ _ rules)) = (Rules.FindHol rules)
-(Rules.FindHol (End)) = 0
-(Rules.FindHol (Rule _ (Hol name) rules)) = 1
-(Rules.FindHol (Rule _ rhs        rules)) = (Rules.FindHol rules)
+(Func.FindGol (Func _ _ rules)) = (Rules.FindGol rules)
+(Rules.FindGol (End)) = 0
+(Rules.FindGol (Rule _ (Gol name) rules)) = 1
+// (Rules.FindGol (Rule _ (Let) rules)) = 1 // TODO
+(Rules.FindGol (Rule _ rhs        rules)) = (Rules.FindGol rules)
 
 
 // #############################################################################
@@ -1863,7 +1855,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
 
 
-(Test.0) = `
+(Test.0) = "
   // Booleans
   Bool : Type
     True  : Bool
@@ -1975,7 +1967,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
   Main : {Foo == Zero}
     Main = refl Zero
-`
+"
 
 (File.NameToFunc file name) = (File.NameToFunc.Go file (File.NameToId file name))
   (File.NameToFunc.Go file (None   )) = None
@@ -1992,10 +1984,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 (Kind2.CompileKDL code) = (Kind2.CompileKDL.Go (File.Read code))
   (Kind2.CompileKDL.Go (Er err )) = err
   (Kind2.CompileKDL.Go (Ok file)) =
-    let has_hols = (File.FindHol file)
-    (Kind2.CompileKDL.Go2 has_hols file)
+    let has_goals = (File.FindGol file)
+    (Kind2.CompileKDL.Go2 has_goals file)
 
-    (Kind2.CompileKDL.Go2 1 file) = (Error "A file with Hols can't be compiled to KDL")
+    (Kind2.CompileKDL.Go2 1 file) = (Error "A file with Goals can't be compiled to KDL")
     (Kind2.CompileKDL.Go2 0 file) = (File.Compile file)
 
 (GetFile  (Ok   f)) = f
@@ -2058,7 +2050,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
     // Returns the first element of a list
     (List.Head t:Type x:(List t)) : t
-      (List.Head t (Cons t x xs)) = x
+      (List.Head _1 (Cons _2 x _3)) = x
 
     // Map a function through a list
     (List.Map t:Type u:Type f:∀(x:t)u xs:(List t)) : (List u)
