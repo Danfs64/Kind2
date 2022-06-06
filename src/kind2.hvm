@@ -282,7 +282,7 @@ NewLine = (StrCons 10 StrNil)
   (| (== '>' chr)
   (| (== '=' chr)
   (| (== '!' chr)
-     0))))))))))))
+    0))))))))))))
 
 // (Bind a_parser:(Parser a) b_parser:(∀a (Parser B))) : (Parser B)
 (Bind a_parser b_parser) = λcode (Bind.Go b_parser (a_parser code))
@@ -1657,11 +1657,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 // Compiler
 // ========
 
-(Compile.to_khvm (Lam name body)) =
-  λx((String.Show.Go (Name.GetString name))
-    ((Compile.to_khvm body)
-    x))
-
 // (Term.Compile term:Term file:File) : String
 (Term.Compile file term) = ((Term.Compile.Go term file "") "")
   (Term.Compile.Go (Var name) file ident) =
@@ -1732,6 +1727,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go.Let 0 (Let name expr body) file ident) =
     λx((Term.Compile.Go body file ident)
       x)
+  // TODO encontrar o name dentro do body, substituir o namo por expr, e então compila o novo body
+  // (Term.Compile.Go.Let 1 (Let name expr body) file ident) =
+  //   λx((Term.Compile.Go body file ident)
+  //     x)
   (Term.Compile.Go.Let n (Let name expr body) file ident) =
     λx((String.Show.Go "let ")
       ((String.Show.Go (Name.GetString name))
@@ -1969,9 +1968,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     Main = refl Zero
 "
 
-(File.NameToFunc file name) = (File.NameToFunc.Go file (File.NameToId file name))
-  (File.NameToFunc.Go file (None   )) = None
-  (File.NameToFunc.Go file (Some id)) = (Pair.Snd (File.GotFunc file id))
+(File.NameToFunc file name) = (Pair.Snd (File.GotFunc file (Ctr.GetId (Term.Read file name))))
 
 (Kind2.Check code) = (Kind2.Check.Go (File.Read code))
   (Kind2.Check.Go (Er err))  = err
@@ -2001,7 +1998,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 // (Main n) = (Kind2.Run Test.0)
 
 (Main) =
-  let code = "
+  let code = `
     // Booleans
     Bool : Type
       True  : Bool
@@ -2077,14 +2074,14 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       Main =
         let a = (* (+ (Bar 1) 1) 2)
         a
-  "
+  `
 
-  // let file = (GetFile (File.Read code))
-  // let func = (GetMaybe (File.NameToFunc file "List.Head"))
+  let file = (GetFile (File.Read code))
+  let func = (GetMaybe (File.NameToFunc file "Main"))
   // func
-  // let term = (Rules.LHS (Func.GetRules func))
-  // [term, (Term.Compile file term)]
+  let term = (Rules.RHS (Func.GetRules func))
+  [term NewLine (Term.Compile file term)]
 
-  (Kind2.CompileKDL code)
+  // (Kind2.CompileKDL code)
   // (Kind2.CompileKDL Test.0)
   // (File.Show file)
