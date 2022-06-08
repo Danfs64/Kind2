@@ -1704,19 +1704,21 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Term.Compile.Go body file "")
       x))))
   (Term.Compile.Go (App func argm) file ident) =
-    λx((String.Show.Go "(")
+    λx((String.Show.Go "(! ")
       ((Term.Compile.Go func file "")
       ((String.Show.Go " ")
       ((Term.Compile.Go argm file "")
       ((String.Show.Go ")")
       x)))))
   (Term.Compile.Go (Cts ctid args) file ident) =
-    λx((Term.Compile.Go.CtrPrefix ctid file)
-      ((String.Show.Go "(")
+    // TODO Functions are enclosed in (), Constructors are enclosed in {}
+    let brackets = (Term.Compile.Go.CtrBrackets ctid file)
+    λx(Pair.Get brackets λlft λrgt (
+      ((String.Show.Go lft)
       ((String.Show.Go (Name.GetString ctid))
       ((Term.Compile.Go.Cts.Args args file)
-      ((String.Show.Go ")")
-      x)))))
+      ((String.Show.Go rgt)
+      x))))))
   (Term.Compile.Go (Eql val0 val1) file ident) =
     λx(x)
   (Term.Compile.Go (Rfl expr) file ident) =
@@ -1759,6 +1761,8 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx((Term.Compile.Go new_body file ident)
       x)
 
+  (Term.Compile.Go.CtrBrackets ctid file) =
+    (U32.If (File.IsCtr file ctid) (Pair "{" "}") (Pair "(" ")"))
   (Term.Compile.Go.CtrPrefix ctid file) =
     let pref = (U32.If (File.IsCtr file ctid) "$" "!")
     λx((String.Show.Go pref) x)
@@ -1818,16 +1822,17 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
   // If a Func has no rules, per File.IsCtr, it is a Constructor
   (File.Compile.Go (Cons (Func lhs.t lhs.r End) funs) file) =
-    λz((Term.Compile.Go lhs.t file "")
+    λz((String.Show.Go "ctr ")
+      ((Term.Compile.Go lhs.t file "")
       ((String.Show.Go NewLine)
       ((File.Compile.Go funs file)
-      z)))
+      z))))
 
   // Otherwise, it is a Function
   (File.Compile.Go (Cons (Func lhs.t lhs.r rules) funs) file) =
-    λz((Term.Compile.Go lhs.t file "")
+    λz((String.Show.Go "fun ")
+      ((Term.Compile.Go lhs.t file "")
       ((String.Show.Go " {")
-      ((String.Show.Go NewLine)
       ((Rules.Compile.Go rules file "  ")
       ((String.Show.Go "} = #0")
       ((String.Show.Go NewLine)
@@ -1839,13 +1844,16 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx(x)
   (Rules.Compile.Go (Rule lhs rhs rules) file ident) =
     let nxt_ident = (String.Concat "  " ident)
-    λx((String.Show.Go ident)
+    λx((String.Show.Go NewLine)
+      ((String.Show.Go ident)
       ((Term.Compile.Go lhs file ident)
-      ((String.Show.Go " = ")
+      ((String.Show.Go " =")
+      ((String.Show.Go NewLine)
+      ((String.Show.Go nxt_ident)
       ((Term.Compile.Go rhs file nxt_ident)
       ((String.Show.Go NewLine)
       ((Rules.Compile.Go rules file ident)
-      x))))))
+      x)))))))))
 
 
 // TODO This looks unefficient, there should be a better way
@@ -1861,7 +1869,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 (Func.FindGol (Func _ _ rules)) = (Rules.FindGol rules)
 (Rules.FindGol (End)) = 0
 (Rules.FindGol (Rule _ (Gol name) rules)) = 1
-// (Rules.FindGol (Rule _ (Let) rules)) = 1 // TODO
+// (Rules.FindGol (Rule _ (Let name expr body) rules)) = (Rules.FindGol (Rule _ body rules)) // TODO
 (Rules.FindGol (Rule _ rhs        rules)) = (Rules.FindGol rules)
 
 
@@ -2088,9 +2096,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
     (Main n) : U32
       // Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
-      (Main n) =
+      (Main) =
         let a = (* (+ (Bar 1) 1) 2)
-        let b = (+ a n)
+        let b = λx (+ a x)
         b
   `
 
