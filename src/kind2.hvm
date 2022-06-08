@@ -1671,7 +1671,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go (Let name expr body) file ident) =
     (Term.Compile.Go.Let (Uses name body) (Let name expr body) file ident)
   (Term.Compile.Go (Ann xval xtyp) file ident) =
-    λx((Term.Compile.Go xval file "")
+    λx((Term.Compile.Go xval file ident)
       x)
   (Term.Compile.Go Typ file ident) =
     λx((String.Show.Go "Type")
@@ -1727,10 +1727,32 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go.Let 0 (Let name expr body) file ident) =
     λx((Term.Compile.Go body file ident)
       x)
-  // TODO encontrar o name dentro do body, substituir o namo por expr, e então compila o novo body
-  // (Term.Compile.Go.Let 1 (Let name expr body) file ident) =
-  //   λx((Term.Compile.Go body file ident)
-  //     x)
+  (Term.Compile.Go.Let 1 (Let name expr body) file ident) =
+    let new_body = (Term.Replace name expr body)
+    λx((Term.Compile.Go new_body file ident)
+      x)
+
+  // Searches for `name` inside `body`. Substitutes it for `expr`
+  // (Term.Replace name:Name expr:Term body:Term): Term
+  (Term.Replace name1 expr (Var name2)) =
+    (U32.If (Name.Equal name1 name2) expr (Var name2))
+  (Term.Replace name1 expr (Use name2 numb)) =
+    (U32.If (Name.Equal name1 name2) expr (Use name2 numb))
+  (Term.Replace name expr (O32 oper val0 val1)) =
+    (O32 oper (Term.Replace name expr val0) (Term.Replace name expr val1))
+  (Term.Replace name1 expr1 (Let name2 expr2 body)) =
+    (Let name2 (Term.Replace name1 expr1 expr2) (Term.Replace name1 expr1 body))
+  (Term.Replace name1 expr (Lam name2 body)) =
+    (Lam name2 (Term.Replace name1 expr body))
+  (Term.Replace name expr (App fun argm)) =
+    (App fun (Term.Replace name expr argm))
+  (Term.Replace name expr (Cts ctid args)) =
+    (Cts ctid (Term.Replace name expr args))
+  (Term.Replace name expr (Cons x xs)) =
+    (Cons (Term.Replace name expr x) (Term.Replace name expr xs))
+  (Term.Replace name expr term) =
+    term
+
   (Term.Compile.Go.Let n (Let name expr body) file ident) =
     λx((String.Show.Go "let ")
       ((String.Show.Go (Name.GetString name))
@@ -2076,12 +2098,12 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
         a
   `
 
-  let file = (GetFile (File.Read code))
-  let func = (GetMaybe (File.NameToFunc file "Main"))
+  // let file = (GetFile (File.Read code))
+  // let func = (GetMaybe (File.NameToFunc file "Main"))
   // func
-  let term = (Rules.RHS (Func.GetRules func))
-  [term NewLine (Term.Compile file term)]
+  // let term = (Rules.RHS (Func.GetRules func))
+  // [term NewLine (Term.Compile file term)]
 
-  // (Kind2.CompileKDL code)
+  (Kind2.CompileKDL code)
   // (Kind2.CompileKDL Test.0)
   // (File.Show file)
