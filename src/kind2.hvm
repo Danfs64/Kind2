@@ -1711,7 +1711,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((String.Show.Go ")")
       x)))))
   (Term.Compile.Go (Cts ctid args) file ident) =
-    // TODO Functions are enclosed in (), Constructors are enclosed in {}
     let brackets = (Term.Compile.Go.CtrBrackets ctid file)
     λx(Pair.Get brackets λlft λrgt (
       ((String.Show.Go lft)
@@ -1869,7 +1868,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 (Func.FindGol (Func _ _ rules)) = (Rules.FindGol rules)
 (Rules.FindGol (End)) = 0
 (Rules.FindGol (Rule _ (Gol name) rules)) = 1
-// (Rules.FindGol (Rule _ (Let name expr body) rules)) = (Rules.FindGol (Rule _ body rules)) // TODO
+(Rules.FindGol (Rule _ (Let name expr body) rules)) = (Rules.FindGol (Rule _ body rules))
 (Rules.FindGol (Rule _ rhs        rules)) = (Rules.FindGol rules)
 
 
@@ -2056,9 +2055,8 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
     // Halves a number
     (Nat.Half n:Nat) : Nat
-      (Nat.Half Zero)            = Zero
-      (Nat.Half (Succ Zero))     = Zero
       (Nat.Half (Succ (Succ x))) = (Succ (Nat.Half x))
+      (Nat.Half  _)              = Zero
 
     // Computes 2^n
     (Nat.Pow2 n:Nat) : Nat
@@ -2075,13 +2073,13 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (List.Head _1 (Cons _2 x _3)) = x
 
     // Map a function through a list
-    (List.Map t:Type u:Type f:∀(x:t)u xs:(List t)) : (List u)
-      (List.Map t u f Nil)         = Nil
-      (List.Map t u f (Cons x xs)) = (Cons (f x) (List.Map t u f xs))
+    // (List.Map t:Type u:Type f:∀(x:t)u xs:(List t)) : (List u)
+    //   (List.Map t u f Nil)           = Nil
+    //   (List.Map t u f (Cons _ x xs)) = (Cons u (f x) (List.Map t u f xs))
 
     // Doubles all values for a list of Nats
-    (List.DoubleNat xs:(List Nat)) : (List Nat)
-      (List.DoubleNat xs) = (List.Map Nat Nat Nat.Double xs)
+    // (List.DoubleNat xs:(List Nat)) : (List Nat)
+    //   (List.DoubleNat xs) = (List.Map Nat Nat Nat.Double xs)
 
     Foo : Nat
       Foo = (Nat.Destroy (Nat.Pow2
@@ -2094,7 +2092,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (Bar 1) = 10
       (Bar x) = 20
 
-    (Main n) : U32
+    (Main) : U32
       // Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
       (Main) =
         let a = (* (+ (Bar 1) 1) 2)
