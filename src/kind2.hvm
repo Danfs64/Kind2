@@ -1753,16 +1753,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Replace name expr term) =
     term
 
+  // TODO Not really a fail-proof solution, each use should be dupped
   (Term.Compile.Go.Let n (Let name expr body) file ident) =
-    λx((String.Show.Go "let ")
-      ((String.Show.Go (Name.GetString name))
-      ((String.Show.Go " = ")
-      ((Term.Compile.Go expr file ident)
-      ((String.Show.Go ";")
-      ((String.Show.Go NewLine)
-      ((String.Show.Go ident)
-      ((Term.Compile.Go body file ident)
-      x))))))))
+    let new_body = (Term.Replace name expr body)
+    λx((Term.Compile.Go new_body file ident)
+      x)
 
   (Term.Compile.Go.CtrPrefix ctid file) =
     let pref = (U32.If (File.IsCtr file ctid) "$" "!")
@@ -1990,8 +1985,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     Main = refl Zero
 "
 
-(File.NameToFunc file name) = (Pair.Snd (File.GotFunc file (Ctr.GetId (Term.Read file name))))
-
 (Kind2.Check code) = (Kind2.Check.Go (File.Read code))
   (Kind2.Check.Go (Er err))  = err
   (Kind2.Check.Go (Ok file)) = (Verify.File file)
@@ -2008,6 +2001,8 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
     (Kind2.CompileKDL.Go2 1 file) = (Error "A file with Goals can't be compiled to KDL")
     (Kind2.CompileKDL.Go2 0 file) = (File.Compile file)
+
+(File.NameToFunc file name) = (Pair.Snd (File.GotFunc file (Ctr.GetId (Term.Read file name))))
 
 (GetFile  (Ok   f)) = f
 (GetMaybe (Some x)) = x
@@ -2091,11 +2086,12 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (Bar 1) = 10
       (Bar x) = 20
 
-    Main : U32
+    (Main n) : U32
       // Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
-      Main =
+      (Main n) =
         let a = (* (+ (Bar 1) 1) 2)
-        a
+        let b = (+ a n)
+        b
   `
 
   // let file = (GetFile (File.Read code))
