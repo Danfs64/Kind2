@@ -739,18 +739,45 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 // (Func.GetRules func:Func ...) : ...
 (Func.GetRules (Func lty rty rules)) = rules
 
-// (File.Make (List Decl)) : File
-(File.Make decls) = (File (File.Make.Go decls Empty))
+// It reverses the list, so it is in the correct order of declaration
+// It also converts the pairs back to Funcs, since the ctids are no longer needed
+// (TermList.Reverse xs:<List<Pair<A,B>>): List<B>
+(TermList.Reverse xs) = (TermList.Reverse.Go xs Nil)
+  (TermList.Reverse.Go Nil                  ys) = ys
+  (TermList.Reverse.Go (Cons (Pair a b) xs) ys) = (TermList.Reverse.Go xs (Cons b ys))
 
-  (File.Make.Go (Cons (DefType lhs rhs) decls) file) =
-    let ctid = (Ctr.GetId lhs)
+// (TermList.Mul xs:List<Pair<A,B>> key:A func:B->B): List<Pair<A,B>>
+(TermList.Mut  Nil                 key func) = Nil
+(TermList.Mut (Cons (Pair a b) xs) key func) =
+  (TermList.Mut.Go (== a key) (Cons (Pair a b) xs) key func)
+
+  (TermList.Mut.Go 0 (Cons x xs) key func) = (Cons x (TermList.Mut xs key func))
+  (TermList.Mut.Go 1 (Cons x xs) key func) = (Cons (Pair.MutSnd x func) xs)
+
+// I changed File.Make so it would return, in a pair with the File it normally does,
+// a List of the Terms in the (inverse) order they are declared in the original code.
+// This was the way I found to have the terms in order, because I need to compiled in order.
+// The TermList functions declared above this comment are here only because of such need as well
+// - Danfs
+
+// (File.Make (List Decl)) : Pair<File, List<Term>>
+(File.Make decls) =
+  (Pair.Get (File.Make.Go decls (Pair Empty Nil)) λmap λlist
+  (Pair (File map) (TermList.Reverse list)))
+
+  (File.Make.Go (Cons (DefType lhs rhs) decls) (Pair file_map file_list)) =
+    let ctid_hash = (Name.GetHash (Ctr.GetId lhs))
     let func = (Func lhs rhs End)
-    (File.Make.Go decls (Set file (Name.GetHash ctid) func))
+    let new_map = (Set file_map ctid_hash func)
+    let new_list = (Cons (Pair ctid_hash func) file_list)
+    (File.Make.Go decls (Pair new_map new_list))
 
-  (File.Make.Go (Cons (DefRule lhs rhs) decls) file) =
-    let ctid = (Ctr.GetId lhs)
+  (File.Make.Go (Cons (DefRule lhs rhs) decls) (Pair file_map file_list)) =
+    let ctid_hash = (Name.GetHash (Ctr.GetId lhs))
     let func = λfunc (FuncAddRule func (File.Make.LHS lhs rhs) rhs)
-    (File.Make.Go decls (Mut file (Name.GetHash ctid) func))
+    let new_map = (Mut file_map ctid_hash func)
+    let new_list = (TermList.Mut file_list ctid_hash func)
+    (File.Make.Go decls (Pair new_map new_list))
 
   (File.Make.Go Nil file) = file
 
@@ -1670,6 +1697,8 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       x)
   (Term.Compile.Go (Let name expr body) file ident) =
     (Term.Compile.Go.Let (Uses name body) (Let name expr body) file ident)
+  // (Term.Compile.Go (Ann xval Typ) file ident) =
+  //   λx(x)
   (Term.Compile.Go (Ann xval xtyp) file ident) =
     λx((Term.Compile.Go xval file ident)
       x)
@@ -1805,7 +1834,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Oper.Compile.Go NEQ) = (String.Show.Go "!=")
 
 
-(File.Compile file) = ((File.Compile.Go (Map.Values (File.GetFuncs file)) file) "")
+(File.Compile file term_list) = ((File.Compile.Go term_list file) "")
   (File.Compile.Go Nil file) =
     λz(z)
 
@@ -1994,25 +2023,25 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
 (Kind2.Check code) = (Kind2.Check.Go (File.Read code))
   (Kind2.Check.Go (Er err))  = err
-  (Kind2.Check.Go (Ok file)) = (Verify.File file)
+  (Kind2.Check.Go (Ok (Pair file _))) = (Verify.File file)
 
 (Kind2.Run code) = (Kind2.Run.Go (File.Read code) "Main")
   (Kind2.Run.Go (Er err)  expr) = err
-  (Kind2.Run.Go (Ok file) expr) = (Term.Show file (Normal file (Term.Read file expr)))
+  (Kind2.Run.Go (Ok (Pair file _)) expr) = (Term.Show file (Normal file (Term.Read file expr)))
 
 (Kind2.CompileKDL code) = (Kind2.CompileKDL.Go (File.Read code))
   (Kind2.CompileKDL.Go (Er err )) = err
-  (Kind2.CompileKDL.Go (Ok file)) =
+  (Kind2.CompileKDL.Go (Ok (Pair file term_list))) =
     let has_goals = (File.FindGol file)
-    (Kind2.CompileKDL.Go2 has_goals file)
+    (Kind2.CompileKDL.Go2 has_goals file term_list)
 
-    (Kind2.CompileKDL.Go2 1 file) = (Error "A file with Goals can't be compiled to KDL")
-    (Kind2.CompileKDL.Go2 0 file) = (File.Compile file)
+    (Kind2.CompileKDL.Go2 1 file term_list) = (Error "A file with Goals can't be compiled to KDL")
+    (Kind2.CompileKDL.Go2 0 file term_list) = (File.Compile file term_list)
 
 (File.NameToFunc file name) = (Pair.Snd (File.GotFunc file (Ctr.GetId (Term.Read file name))))
 
-(GetFile  (Ok   f)) = f
-(GetMaybe (Some x)) = x
+(GetFile  (Ok (Pair f l))) = f
+(GetMaybe (Some x       )) = x
 
 (Rules.LHS  (Rule lhs rhs xs)) = lhs
 (Rules.RHS  (Rule lhs rhs xs)) = rhs
