@@ -3,7 +3,6 @@
 ## Dúvidas Gerais
 
 * A `Main` do Kind2 deveria virar um `run` no kdl?
-* Depois da remoção dos nametable, os cases das funções vem na ordem inversa
 * Veio um print de '$' no Term.Show.Go de Use. Seria isso um erro nos Term.Show?
 
 ## Dúvidas relacionadas a arrancar código inútil/repetido
