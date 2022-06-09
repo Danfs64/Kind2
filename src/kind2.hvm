@@ -1829,15 +1829,21 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
   // Otherwise, it is a Function
   (File.Compile.Go (Cons (Func lhs.t lhs.r rules) funs) file) =
+    let rrs = (Rules.Reverse rules)
     λz((String.Show.Go "fun ")
       ((Term.Compile.Go lhs.t file "")
       ((String.Show.Go " {")
-      ((Rules.Compile.Go rules file "  ")
+      ((Rules.Compile.Go rrs file "  ")
       ((String.Show.Go "} = #0")
       ((String.Show.Go NewLine)
       ((String.Show.Go NewLine)
       ((File.Compile.Go funs file)
       z))))))))
+
+  // Reverse a list of Rules
+  (Rules.Reverse rs) = (Rules.Reverse.Go rs End)
+    (Rules.Reverse.Go  End              ys) = ys
+    (Rules.Reverse.Go (Rule lhs rhs rs) ys) = (Rules.Reverse.Go rs (Rule lhs rhs ys))
 
   (Rules.Compile.Go End file ident) =
     λx(x)
