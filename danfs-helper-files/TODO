@@ -13,7 +13,6 @@
 
 ## TODO
 
-* Descobrir como obter as funções na ordem de entrada, e não na ordem do mapa
 * Variáveis usadas múltiplas vezes precisam ser `dup`adas
   * Colocar os dups em uma linha própria cada um, usando mais um nível de ident
 * Se o name de um `let` é usado múltiplas vezes, tem que fazer `dup`
