@@ -1724,6 +1724,22 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx(x)
   (Term.Compile.Go (Rwt name witn goal expr) file ident) =
     λx(x)
+  (Term.Compile.Go (Dup name value body) file ident) =
+    let name_str = (Name.GetString name)
+    let name0 = (Name.Make (String.Concat name_str "..0"))
+    let name1 = (Name.Make (String.Concat name_str "..1"))
+    let new_body = (Term.ReplaceOnce name (Var name1) (Term.ReplaceOnce name (Var name0) body))
+    λx((String.Show.Go "dup ")
+      ((String.Show.Go (Name.GetString name0))
+      ((String.Show.Go " ")
+      ((String.Show.Go (Name.GetString name1))
+      ((String.Show.Go " = ")
+      ((Term.Compile.Go value file ident)
+      ((String.Show.Go ";")
+      ((String.Show.Go NewLine)
+      ((String.Show.Go ident)
+      ((Term.Compile.Go new_body file ident)
+      x))))))))))
 
   (Term.Compile.Go.Let 0 (Let name expr body) file ident) =
     λx((Term.Compile.Go body file ident)
@@ -1732,17 +1748,44 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     let new_body = (Term.Replace name expr body)
     λx((Term.Compile.Go new_body file ident)
       x)
+  (Term.Compile.Go.Let 2 (Let name expr body) file ident) =
+    λx((Term.Compile.Go (Dup name expr body) file ident)
+      x)
 
-  // Searches for `name` inside `body`. Substitutes it for `expr`
-  // (Term.Replace name:Name expr:Term body:Term): Term
-  (Term.Replace name1 expr (Var name2)) =
-    (U32.If (Name.Equal name1 name2) expr (Var name2))
-  (Term.Replace name1 expr (Use name2 numb)) =
-    (U32.If (Name.Equal name1 name2) expr (Use name2 numb))
-  (Term.Replace name expr (O32 oper val0 val1)) =
-    (O32 oper (Term.Replace name expr val0) (Term.Replace name expr val1))
-  (Term.Replace name1 expr1 (Let name2 expr2 body)) =
-    (Let name2 (Term.Replace name1 expr1 expr2) (Term.Replace name1 expr1 body))
+  // Searches the first appearance of `name` inside `body`. Substitutes it for `expr`
+  // (Term.ReplaceOnce name:Name expr:Term body:Term): Term
+  (Term.ReplaceOnce name expr body) =
+    (Pair.Snd (Term.ReplaceOnce.Go name expr body))
+  // (Term.ReplaceOnce.Go Name Term Term): (Pair Bool Term)
+  (Term.ReplaceOnce.Go name1 expr (Var name2)) =
+    let eql = (Name.Equal name1 name2)
+    (Pair eql (U32.If eql expr (Var name2)))
+  (Term.ReplaceOnce.Go name1 expr (Use name2 numb)) =
+    let eql = (Name.Equal name1 name2)
+    (Pair eql (U32.If eql expr (Use name2 numb)))
+  (Term.ReplaceOnce.Go name expr (O32 oper val0 val1)) =
+    let lft = (Term.ReplaceOnce.Go name expr val0)
+    (Term.ReplaceOnce.Go.O32 lft name expr (O32 oper val0 val1))
+
+    (Term.ReplaceOnce.Go.O32 (Pair 1 l_body) name expr (O32 oper val0 val1)) =
+      (Pair 1 (O32 oper l_body val1))
+    (Term.ReplaceOnce.Go.O32 (Pair 0 l_body) name expr (O32 oper val0 val1)) =
+      let rgt = (Term.ReplaceOnce.Go name expr val1)
+      (Pair.Get rgt λbool λr_body (
+        (Pair bool (O32 oper l_body r_body))
+      ))
+  (Term.ReplaceOnce.Go name1 expr1 (Let name2 expr2 body)) =
+    let exp = (Term.ReplaceOnce.Go name1 expr1 expr2)
+    (Term.ReplaceOnce.Go.Let exp name1 expr1 (Let name2 expr2 body))
+
+    (Term.ReplaceOnce.Go.Let (Pair 1 n_expr) name1 expr1 (Let name2 expr2 body)) =
+      (Pair 1 (Let name2 n_expr body))
+    (Term.ReplaceOnce.Go.Let (Pair 0 n_expr) name1 expr1 (Let name2 expr2 body)) =
+      let n_body = (Term.ReplaceOnce.Go name1 expr1 body)
+      (Pair.Get n_body λbool λbody (
+        (Pair bool (Let name2 n_expr body)) 
+      ))
+
   (Term.Replace name1 expr (Lam name2 body)) =
     (Lam name2 (Term.Replace name1 expr body))
   (Term.Replace name expr (App fun argm)) =
@@ -2106,12 +2149,13 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
         b
   `
 
-  // let file = (GetFile (File.Read code))
-  // let func = (GetMaybe (File.NameToFunc file "Main"))
+  let file = (GetFile (File.Read code))
+  let func = (GetMaybe (File.NameToFunc file "Main"))
+  ((File.Compile.Go [func] file) "")
   // func
   // let term = (Rules.RHS (Func.GetRules func))
   // [term NewLine (Term.Compile file term)]
 
-  (Kind2.CompileKDL code)
+  // (Kind2.CompileKDL code)
   // (Kind2.CompileKDL Test.0)
   // (File.Show file)
