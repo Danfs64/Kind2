@@ -1745,7 +1745,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx((Term.Compile.Go body file ident)
       x)
   (Term.Compile.Go.Let 1 (Let name expr body) file ident) =
-    let new_body = (Term.Replace name expr body)
+    let new_body = (Term.ReplaceOnce name expr body)
     λx((Term.Compile.Go new_body file ident)
       x)
   (Term.Compile.Go.Let 2 (Let name expr body) file ident) =
@@ -2145,7 +2145,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       // Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
       (Main) =
         let a = (* (+ (Bar 1) 1) 2)
-        let b = λx (+ a x)
+        let b = (+ a a)
         b
   `
 
