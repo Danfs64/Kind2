@@ -105,7 +105,13 @@
 (List.Fold Nil         nil cons) = nil
 (List.Fold (Cons x xs) nil cons) = (cons x (List.Fold xs nil cons))
 
+// (List.DecRange n:U32) : (List U32)
+(List.Range n) = (List.Range.Go n 0)
+  (List.Range.Go 0 v) = (Nil)
+  (List.Range.Go n v) = (Cons v (List.Range.Go (- n 1) (+ v 1)))
 
+// (List.Get (List A) (∀A ∀(List A) B)) : B
+(List.Get (Cons x xs) fn) = (fn x xs)
 
 // Name
 // ====
@@ -1760,6 +1766,26 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx((Term.Compile.Go new_body file ident)
       x)
 
+  // Duplicates a `name`, that has value `expr`, into `body`, `n` times
+  // (Term.Duplicator Name Term Term U32): Term
+  (Term.Duplicator (Name str hash) expr body n) =
+    let n_dups = (- n 1)
+    let n_aux  = (- n 2)
+    let var_names = (Term.Duplicator.GenVarNames str n)
+    let var_names = (List.Concat (Term.Duplicator.GenVarNames "aux" n_aux) var_names)
+    (List.Get var_names λx λxs
+    (List.Get xs        λy λys
+    (Dup x y expr (Term.Duplicator.Go 0 (- n_dups 1) body ys))))
+
+    (Term.Duplicator.Go i 0      body var_names           ) = body
+    (Term.Duplicator.Go i n_dups body (Cons x (Cons y ys))) =
+      let expr = (Name.Make (String.Concat "aux.." (U32.Show i)))
+      (Dup x y expr (Term.Duplicator.Go (+ i 1) (- n_dups 1) body ys))
+
+  (Term.Duplicator.GenVarNames var_name n) =
+    let range = (List.Range n)
+    (List.Map range λx(String.Concat var_name (String.Concat ".." (U32.Show x))))
+
   (Term.Compile.Go.CtrBrackets ctid file) =
     (U32.If (File.IsCtr file ctid) (Pair "{" "}") (Pair "(" ")"))
   (Term.Compile.Go.CtrPrefix ctid file) =
@@ -2098,20 +2124,35 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (Bar 1) = 10
       (Bar x) = 20
 
-    (Main) : U32
+    (Main U32) : U32
       // Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
-      (Main) =
+      (Main n) =
         let a = (* (+ (Bar 1) 1) 2)
         let b = λx (+ a x)
-        b
+        (+ n (+ n n))
   `
 
-  // let file = (GetFile (File.Read code))
-  // let func = (GetMaybe (File.NameToFunc file "Main"))
+  let file = (GetFile (File.Read code))
+  let func = (GetMaybe (File.NameToFunc file "Main"))
   // func
-  // let term = (Rules.RHS (Func.GetRules func))
+  let term = (Rules.RHS (Func.GetRules func))
   // [term NewLine (Term.Compile file term)]
 
-  (Kind2.CompileKDL code)
+  // (Kind2.CompileKDL code)
   // (Kind2.CompileKDL Test.0)
   // (File.Show file)
+
+  (Term.Duplicator
+    (Name "n" 123)
+    (N32 50)
+    (O32
+      (ADD)
+      (Var (Name "n" 110))
+      (O32
+        (ADD)
+        (Var (Name "n" 110))
+        (Var (Name "n" 110))
+      )
+    )
+    3
+  )
