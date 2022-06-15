@@ -1731,10 +1731,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go (Rwt name witn goal expr) file ident) =
     λx(x)
   (Term.Compile.Go (Dup name0 name1 expr body) file ident) =
-    // let name_str = (Name.GetString name)
-    // let name0 = (Name.Make (String.Concat name_str "..0"))
-    // let name1 = (Name.Make (String.Concat name_str "..1"))
-    // let new_body = (Term.ReplaceOnce name (Var name1) (Term.ReplaceOnce name (Var name0) body))
     λx((String.Show.Go "dup ")
       ((String.Show.Go (Name.GetString name0))
       ((String.Show.Go " ")
@@ -1874,10 +1870,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Oper.Compile.Go NEQ) = (String.Show.Go "!=")
 
 
+// TODO A lot of stuff that is done inside the .Compile functions
+// (like convert unused variables to ~, dupping, removing Theorems)
+// should actually be done inside a Sanatize function,
+// and the return from Sanatize is then compiled
 (File.Compile file) =
-  // TODO A lot of stuff that is done inside the .Compile functions
-  // (like convert unused variables to ~ and dupping)
-  // should actually be done here, inside a Sanatize function
   // let sanatized_funcs = (File.Sanatize file)
   ((File.Compile.Go (Map.Values (File.GetFuncs file)) file) "")
 
