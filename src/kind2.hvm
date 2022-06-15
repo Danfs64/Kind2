@@ -1880,27 +1880,29 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
   (File.Compile.Go Nil file) =
     λz(z)
+  (File.Compile.Go (Cons func funcs) file) =
+    λz((Func.Compile.Go func  file)
+      ((File.Compile.Go funcs file)
+      z))
 
   // Funcs that return an Equal (Eql) are theorems, and should not be compiled
-  (File.Compile.Go (Cons (Func lhs.t (Eql _ _) rules) funs) file) =
-    λz((File.Compile.Go funs file)
-      z)
+  (Func.Compile.Go (Func _ (Eql _ _) rules) file) =
+    λz(z)
+
 
   // // Declarations of types (e.g. Bool : Type) are not to be compiled, only their constructors
-  // (File.Compile.Go (Cons (Func lhs.t Typ rules) funs) file) =
-  //   λz((File.Compile.Go funs file)
-  //     z)
+  // (Func.Compile.Go (Func _ Typ rules) file) =
+  //   λz(z)
 
   // If a Func has no rules, per File.IsCtr, it is a Constructor
-  (File.Compile.Go (Cons (Func lhs.t lhs.r End) funs) file) =
+  (Func.Compile.Go (Func lhs.t lhs.r End) file) =
     λz((String.Show.Go "ctr ")
       ((Term.Compile.Go lhs.t file "")
       ((String.Show.Go NewLine)
-      ((File.Compile.Go funs file)
-      z))))
+      z)))
 
   // Otherwise, it is a Function
-  (File.Compile.Go (Cons (Func lhs.t lhs.r rules) funs) file) =
+  (Func.Compile.Go (Func lhs.t lhs.r rules) file) =
     let rrs = (Rules.Reverse rules)
     λz((String.Show.Go "fun ")
       ((Term.Compile.Go lhs.t file "")
@@ -1909,8 +1911,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((String.Show.Go "} = #0")
       ((String.Show.Go NewLine)
       ((String.Show.Go NewLine)
-      ((File.Compile.Go funs file)
-      z))))))))
+      z)))))))
 
   // Reverse a list of Rules
   (Rules.Reverse rs) = (Rules.Reverse.Go rs End)
