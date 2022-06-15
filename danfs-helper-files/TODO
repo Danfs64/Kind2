@@ -13,7 +13,6 @@
 ## TODO
 
 * FLATTENER
-* Descobrir como obter as funções na ordem de entrada, e não na ordem do mapa
 * Variáveis usadas múltiplas vezes precisam ser `dup`adas
 * Se o name de um `let` é usado múltiplas vezes, tem que fazer `dup`
   * Descobrir como fazer pra mais de 2 usos
