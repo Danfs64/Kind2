@@ -1825,19 +1825,55 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     let var_names = (List.Concat (Term.Duplicator.GenVarNames "aux" n_aux) var_names)
     (List.Get var_names λx λxs
     (List.Get xs        λy λys
-    (Dup (Name.Make x) (Name.Make y) expr (Term.Duplicator.Go 0 (- n_dups 1) body ys))))
+    (Dup (Name.Make x) (Name.Make y) expr (Term.Duplicator.Go (Name str hash) 0 body ys))))
 
-    // TODO update body with the new var names
-    (Term.Duplicator.Go i 0      body var_names           ) =
-      body
-    (Term.Duplicator.Go i n_dups body (Cons x (Cons y ys))) =
+    // (Term.Duplicator.Go Name U32 Term List<String>): Term
+    (Term.Duplicator.Go name i body Nil) =
+      (Term.Duplicator.UpdateVars name body)
+    (Term.Duplicator.Go name i body (Cons x (Cons y ys))) =
       let expr = (Var (Name.Make (String.Concat "aux.." (U32.Show i))))
-      (Dup (Name.Make x) (Name.Make y) expr (Term.Duplicator.Go (+ i 1) (- n_dups 1) body ys))
+      (Dup (Name.Make x) (Name.Make y) expr (Term.Duplicator.Go name (+ i 1) body ys))
 
   (Term.Duplicator.GenVarNames var_name n) =
     let range = (List.Range n)
     let enum_var = λx(String.Concat var_name (String.Concat ".." (U32.Show x)))
     (List.Map range enum_var)
+
+  // (Term.Duplicator.UpdateVars Name Term): Term
+  (Term.Duplicator.UpdateVars name body) =
+    (Pair.Snd (Term.Duplicator.UpdateVars.Go name body 0))
+
+    // (Term.Duplicator.UpdateVars.Go Name Term U32): (Pair U32 Term)
+    (Term.Duplicator.UpdateVars.Go name (Var v_name) i) =
+      let eql = (Name.Equal name v_name)
+      (Term.Duplicator.UpdateVars.Go.Var eql name (Var v_name) i)
+
+      (Term.Duplicator.UpdateVars.Go.Var 0 name (Var v_name) i) =
+        (Pair i (Var v_name))
+      (Term.Duplicator.UpdateVars.Go.Var 1 (Name str hash) (Var v_name) i) =
+        let new_str  = (String.Concat str (String.Concat ".." (U32.Show i)))
+        let new_name = (Name.Make new_str)
+        (Pair (+ i 1) (Var new_name))
+
+    (Term.Duplicator.UpdateVars.Go name (O32 oper val0 val1) i) =
+      let lft = (Term.Duplicator.UpdateVars.Go name val0 i)
+      (Pair.Get lft λlft_i λlft_body
+      (Term.Duplicator.UpdateVars.Go.O32 name (O32 oper lft_body val1) lft_i))
+
+      (Term.Duplicator.UpdateVars.Go.O32 name (O32 oper val0 val1) i) =
+        let rgt = (Term.Duplicator.UpdateVars.Go name val1 i)
+        (Pair.Get rgt λrgt_i λrgt_body
+        (Pair rgt_i (O32 oper val0 rgt_body)))
+
+    (Term.Duplicator.UpdateVars.Go name (Let l_name expr body) i) =
+      let rec = (Term.Duplicator.UpdateVars.Go name expr i)
+      (Pair.Get rec λrec_i λrec_expr
+      (Term.Duplicator.UpdateVars.Go.Let name (Let l_name rec_expr body) rec_i))
+
+      (Term.Duplicator.UpdateVars.Go.Let name (Let l_name expr body) i) =
+        let rec = (Term.Duplicator.UpdateVars.Go name body i)
+        (Pair.Get rec λrec_i λrec_body
+        (Pair rec_i (Let l_name expr rec_body)))
 
   (Term.Compile.Go.CtrBrackets ctid file) =
     (U32.If (File.IsCtr file ctid)
@@ -2192,16 +2228,17 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (Main n) =
         let a = (* (+ (Bar 1) 1) 2)
         // let b = λx (+ a x)
-        (+ a (+ a a))
+        let b = a
+        (+ a (+ b b))
   `
 
   let file = (GetFile (File.Read code))
   let func = (GetMaybe (File.NameToFunc file "Main"))
-  // ((File.Compile.Go [func] file) "")
+  ((File.Compile.Go [func] file) "")
   // func
-  let term = (Rules.RHS (Func.GetRules func))
+  // let term = (Rules.RHS (Func.GetRules func))
   // [term NewLine (Term.Compile file term)]
 
-  (Kind2.CompileKDL code)
+  // (Kind2.CompileKDL code)
   // (Kind2.CompileKDL Test.0)
   // (File.Show file)
