@@ -1875,6 +1875,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
         (Pair.Get rec λrec_i λrec_body
         (Pair rec_i (Let l_name expr rec_body)))
 
+    // (Term.Duplicator.UpdateVars.Go name (Lam l_name body) i) =
+    // (Term.Duplicator.UpdateVars.Go name (App func argm) i) =
+    // (Term.Duplicator.UpdateVars.Go name (Cts ctid args) i) =
+    // (Term.Duplicator.UpdateVars.Go name (Cons head tail) i) =
+
   (Term.Compile.Go.CtrBrackets ctid file) =
     (U32.If (File.IsCtr file ctid)
       (Pair "{" "}")
