@@ -1746,7 +1746,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((String.Show.Go ")")
       x)))))
   (Term.Compile.Go (Cts ctid args) file ident) =
-    let brackets = (Term.Compile.Go.CtrBrackets ctid file)
+    let brackets = (Term.Compile.Go.Ctr.Brackets ctid file)
     λx(Pair.Get brackets λlft λrgt (
       ((String.Show.Go lft)
       ((String.Show.Go (Name.GetString ctid))
@@ -1797,7 +1797,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (O32 oper lft rgt)
   (Term.Replace name expr (Let l_name l_expr body)) =
     let new_expr = (Term.Replace name expr l_expr)
-    let new_body = (Term.Replace name expr body)
+    let new_body = (Term.Replace.LetBody (Name.Equal name l_name) name expr body)
     (Let l_name new_expr new_body)
   (Term.Replace name expr (Lam l_name body)) =
     let new_body = (Term.Replace name expr body)
@@ -1815,6 +1815,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Replace name expr body) =
     body
 
+  (Term.Replace.LetBody 1 name expr body) =
+    body
+  (Term.Replace.LetBody 0 name expr body) =
+    (Term.Replace name expr body)
+
 
   // Duplicates a `name`, that has value `expr`, into `body`, `n` times
   // (Term.Duplicator Name Term Term U32): Term
@@ -1829,7 +1834,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
     // (Term.Duplicator.Go Name U32 Term List<String>): Term
     (Term.Duplicator.Go name i body Nil) =
-      (Term.Duplicator.UpdateVars name body)
+      (Term.Duplicator.UpdateBody name body)
     (Term.Duplicator.Go name i body (Cons x (Cons y ys))) =
       let expr = (Var (Name.Make (String.Concat "aux.." (U32.Show i))))
       (Dup (Name.Make x) (Name.Make y) expr (Term.Duplicator.Go name (+ i 1) body ys))
@@ -1839,55 +1844,61 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     let enum_var = λx(String.Concat var_name (String.Concat ".." (U32.Show x)))
     (List.Map range enum_var)
 
-  // (Term.Duplicator.UpdateVars Name Term): Term
-  (Term.Duplicator.UpdateVars name body) =
-    (Pair.Snd (Term.Duplicator.UpdateVars.Go name body 0))
+  // (Term.Duplicator.UpdateBody Name Term): Term
+  (Term.Duplicator.UpdateBody name body) =
+    (Pair.Snd (Term.Duplicator.UpdateBody.Go name body 0))
 
-    // (Term.Duplicator.UpdateVars.Go Name Term U32): (Pair U32 Term)
-    (Term.Duplicator.UpdateVars.Go name (Var v_name) i) =
+    // (Term.Duplicator.UpdateBody.Go Name Term U32): (Pair U32 Term)
+    (Term.Duplicator.UpdateBody.Go name (Var v_name) i) =
       let eql = (Name.Equal name v_name)
-      (Term.Duplicator.UpdateVars.Go.Var eql name (Var v_name) i)
+      (Term.Duplicator.UpdateBody.Go.Var eql name (Var v_name) i)
 
-      (Term.Duplicator.UpdateVars.Go.Var 0 name (Var v_name) i) =
+      (Term.Duplicator.UpdateBody.Go.Var 0   name (Var v_name) i) =
         (Pair i (Var v_name))
-      (Term.Duplicator.UpdateVars.Go.Var 1 (Name str hash) (Var v_name) i) =
+      (Term.Duplicator.UpdateBody.Go.Var 1 (Name str hash) (Var v_name) i) =
         let new_str  = (String.Concat str (String.Concat ".." (U32.Show i)))
         let new_name = (Name.Make new_str)
         (Pair (+ i 1) (Var new_name))
 
-    (Term.Duplicator.UpdateVars.Go name (O32 oper val0 val1) i) =
-      let lft = (Term.Duplicator.UpdateVars.Go name val0 i)
+    (Term.Duplicator.UpdateBody.Go name (O32 oper val0 val1) i) =
+      let lft = (Term.Duplicator.UpdateBody.Go name val0 i)
       (Pair.Get lft λlft_i λlft_body
-      (Term.Duplicator.UpdateVars.Go.O32 name (O32 oper lft_body val1) lft_i))
+      (Term.Duplicator.UpdateBody.Go.O32 name (O32 oper lft_body val1) lft_i))
 
-      (Term.Duplicator.UpdateVars.Go.O32 name (O32 oper val0 val1) i) =
-        let rgt = (Term.Duplicator.UpdateVars.Go name val1 i)
+      (Term.Duplicator.UpdateBody.Go.O32 name (O32 oper val0 val1) i) =
+        let rgt = (Term.Duplicator.UpdateBody.Go name val1 i)
         (Pair.Get rgt λrgt_i λrgt_body
         (Pair rgt_i (O32 oper val0 rgt_body)))
 
-    (Term.Duplicator.UpdateVars.Go name (Let l_name expr body) i) =
-      let rec = (Term.Duplicator.UpdateVars.Go name expr i)
+    (Term.Duplicator.UpdateBody.Go name (Let l_name expr body) i) =
+      let rec = (Term.Duplicator.UpdateBody.Go name expr i)
       (Pair.Get rec λrec_i λrec_expr
-      (Term.Duplicator.UpdateVars.Go.Let name (Let l_name rec_expr body) rec_i))
+      (Term.Duplicator.UpdateBody.Go.Let name (Let l_name rec_expr body) rec_i))
 
-      (Term.Duplicator.UpdateVars.Go.Let name (Let l_name expr body) i) =
-        let rec = (Term.Duplicator.UpdateVars.Go name body i)
+      (Term.Duplicator.UpdateBody.Go.Let name (Let l_name expr body) i) =
+        let rec = (Term.Duplicator.UpdateBody.Go name body i)
         (Pair.Get rec λrec_i λrec_body
         (Pair rec_i (Let l_name expr rec_body)))
 
-    // (Term.Duplicator.UpdateVars.Go name (Lam l_name body) i) =
-    // (Term.Duplicator.UpdateVars.Go name (App func argm) i) =
-    // (Term.Duplicator.UpdateVars.Go name (Cts ctid args) i) =
-    // (Term.Duplicator.UpdateVars.Go name (Cons head tail) i) =
+    (Term.Duplicator.UpdateBody.Go name (Lam l_name body) i) =
+      (Term.Duplicator.UpdateBody.Go.Lam.Go (Name.Equal name l_name) name (Lam l_name body) i)
 
-  (Term.Compile.Go.CtrBrackets ctid file) =
+      (Term.Duplicator.UpdateBody.Go.Lam.Go 1 name (Lam l_name body) i) =
+        (Pair i (Lam l_name body))
+      (Term.Duplicator.UpdateBody.Go.Lam.Go 0 name (Lam l_name body) i) =
+        let rec = (Term.Duplicator.UpdateBody.Go name body i)
+        (Pair.Get rec λrec_i λrec_body
+        (Pair rec_i (Lam l_name rec_body)))
+
+    // (Term.Duplicator.UpdateBody.Go name (App func argm) i) =
+    // (Term.Duplicator.UpdateBody.Go name (Cts ctid args) i) =
+    // (Term.Duplicator.UpdateBody.Go name (Cons head tail) i) =
+
+  (Term.Compile.Go.Ctr.Brackets ctid file) =
     (U32.If (File.IsCtr file ctid)
       (Pair "{" "}")
       (Pair "(" ")")
     )
-  // (Term.Compile.Go.CtrPrefix ctid file) =
-  //   let pref = (U32.If (File.IsCtr file ctid) "$" "!")
-  //   λx((String.Show.Go pref) x)
   (Term.Compile.Go.Cts.Args Nil file) =
     λx(x)
   (Term.Compile.Go.Cts.Args (Cons arg args) file) =
