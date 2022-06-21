@@ -1772,6 +1772,30 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Term.Compile.Go body file ident)
       x))))))))))
 
+  (Term.Compile.Go.Ctr.Brackets ctid file) =
+    (U32.If (File.IsCtr file ctid)
+      (Pair "{" "}")
+      (Pair "(" ")")
+    )
+  (Term.Compile.Go.Cts.Args Nil file) =
+    λx(x)
+  (Term.Compile.Go.Cts.Args (Cons arg args) file) =
+    λx((String.Show.Go " ")
+      ((Term.Compile.Go arg file "")
+      ((Term.Compile.Go.Cts.Args args file)
+      x)))
+
+  (Term.Compile.Go.LamName (Lam name body)) =
+    let uses = (Uses name body)
+    (Term.Compile.Go.VarName uses name)
+
+    (Term.Compile.Go.VarName 0 name) =
+      λx((String.Show.Go "~")
+        x)
+    (Term.Compile.Go.VarName n name) =
+      λx((String.Show.Go (Name.GetString name))
+        x)
+
   (Term.Compile.Go.Let 0 (Let name expr body) file ident) =
     λx((Term.Compile.Go body file ident)
       x)
@@ -1916,33 +1940,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (Term.Duplicator.UpdateBody.Go name body i) =
       (Pair i body)
 
-  (Term.Compile.Go.Ctr.Brackets ctid file) =
-    (U32.If (File.IsCtr file ctid)
-      (Pair "{" "}")
-      (Pair "(" ")")
-    )
-  (Term.Compile.Go.Cts.Args Nil file) =
-    λx(x)
-  (Term.Compile.Go.Cts.Args (Cons arg args) file) =
-    λx((String.Show.Go " ")
-      ((Term.Compile.Go arg file "")
-      ((Term.Compile.Go.Cts.Args args file)
-      x)))
-
-  (Term.Compile.Go.LamName (Lam name body)) =
-    let uses = (Uses name body)
-    (Term.Compile.Go.VarName uses name)
-
-    (Term.Compile.Go.VarName 0 name) =
-      λx((String.Show.Go "~")
-        x)
-    (Term.Compile.Go.VarName n name) =
-      λx((String.Show.Go (Name.GetString name))
-        x)
-
-  (String.Show.Go xs) =
-    λx(String.Concat xs x)
-
   (Oper.Compile.Go ADD) = (String.Show.Go "+")
   (Oper.Compile.Go SUB) = (String.Show.Go "-")
   (Oper.Compile.Go MUL) = (String.Show.Go "*")
@@ -1960,6 +1957,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Oper.Compile.Go GTN) = (String.Show.Go ">")
   (Oper.Compile.Go NEQ) = (String.Show.Go "!=")
 
+
+  (String.Show.Go xs) =
+    λx(String.Concat xs x)
 
 // TODO A lot of stuff that is done inside the .Compile functions
 // (like convert unused variables to ~, dupping, removing Theorems)
