@@ -1990,23 +1990,38 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 (Rules.Sanitize End) =
   End
 (Rules.Sanitize (Rule lhs rhs rules)) =
-  let lhs = (Rules.Sanitize.LHS lhs)
-  (Rule lhs rhs (Rules.Sanitize rules))
+  let sides = (Rules.Sanitize.Go lhs rhs)
+  (Pair.Get sides λnew_lhs λnew_rhs
+  (Rule new_lhs new_rhs (Rules.Sanitize rules)))
 
-  (Rules.Sanitize.LHS (Cts ctid args)) =
-    (Cts ctid (Rules.Sanitize.Args args))
+  (Rules.Sanitize.Go (Cts ctid args) rhs) =
+    let new = (Rules.Sanitize.Args args rhs)
+    (Pair.Get new λnew_args λnew_rhs
+    (Pair (Cts ctid new_args) new_rhs))
 
-  (Rules.Sanitize.Args Nil) =
-    Nil
-  (Rules.Sanitize.Args (Cons (Use name n) args)) =
-    let arg = (U32.If (== n 0)
-      (Use (Name.Make "~") 0)
-      (Use name n)
-    )
-    (Cons arg (Rules.Sanitize.Args args))
+  (Rules.Sanitize.Args Nil rhs) =
+    (Pair Nil rhs)
+  (Rules.Sanitize.Args (Cons (Use name n) args) rhs) =
+    let new_use  = (Rules.Sanitize.Use name n rhs)
+    let new_rhs  = (Pair.Snd new_use)
+    let new_name = (Pair.Fst new_use)
+    let rec = (Rules.Sanitize.Args args new_rhs)
+    (Pair.Get rec λrec_args λrec_rhs
+    (Pair (Cons (Use new_name n) rec_args) rec_rhs))
 
-  (Rules.Sanitize.Args (Cons arg args)) =
-    (Cons arg (Rules.Sanitize.Args args))
+  (Rules.Sanitize.Args (Cons arg args) rhs) =
+    let rec = (Rules.Sanitize.Args args rhs)
+    (Pair.Get rec λrec_args λrec_rhs
+    (Pair (Cons arg rec_args) rec_rhs))
+
+  // (Rules.Sanitize.Use Name U32 Term): (Pair Name Term)
+  (Rules.Sanitize.Use name 0 rhs) =
+    (Pair (Name.Make "~") rhs)
+  (Rules.Sanitize.Use name 1 rhs) =
+    (Pair name rhs)
+  (Rules.Sanitize.Use name n rhs) =
+    let new_rhs = (Term.Duplicator name (Var name) rhs n)
+    (Pair name new_rhs)
 
 (File.Compile file func_list) =
   let func_list = (File.Sanitize func_list file)
