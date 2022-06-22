@@ -15,8 +15,6 @@
 
 * FLATTENER
 * Sanitizer:
-  * Variáveis usadas múltiplas vezes precisam ser `dup`adas
   * Só fazer os dups depois de apagar os lets não usados: evita dups inúteis
-  * Trocar variáveis não usadas por ~
 * Como definir o Initial State de uma Função?
   * Proposta do Kelvin: Para toda função `foo`, existir um `foo.state` - de aridade 0 - declarando o initial state
