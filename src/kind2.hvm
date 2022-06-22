@@ -1696,15 +1696,13 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx((String.Show.Go (Name.GetString name))
       x)
   (Term.Compile.Go (Use name uses) file ident) =
-    λx((Term.Compile.Go.VarName uses name)
+    λx((String.Show.Go (Name.GetString name))
       x)
   (Term.Compile.Go (Hol hash) file ident) =
     λx((String.Show.Go "~")
       x)
   (Term.Compile.Go (Let name expr body) file ident) =
     (Term.Compile.Go.Let (Uses name body) (Let name expr body) file ident)
-  // (Term.Compile.Go (Ann xval Typ) file ident) =
-  //   λx(x)
   (Term.Compile.Go (Ann xval xtyp) file ident) =
     λx((Term.Compile.Go xval file ident)
       x)
@@ -1967,27 +1965,52 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 // (like convert unused variables to ~, dupping, removing Theorems)
 // should actually be done inside a Sanitize function,
 // and the return from Sanitize is then compiled
-// (Cons.Go T): List<T> -> List<T>
+// (Cons.Go T): (List T) -> (List T)
 (Cons.Go x) = λxs(Cons x xs)
 
-// (File.Sanatize List<Func> File): List<Func>
+// (File.Sanatize (List Func) File): (List Func)
 (File.Sanitize Nil file) =
   Nil
 (File.Sanitize (Cons (Func lhs.t lhs.r rules) terms) file) =
   ((Func.Sanitize lhs.t lhs.r rules) (File.Sanitize terms file))
 
-// (Func.Sanatize Term Term RuleList): List<Func> -> List<Func>
+// (Func.Sanatize Term Term RuleList): (List Func) -> (List Func)
 // Funcs that return an Equal (Eql) are theorems, and should not be compiled
-(Func.Sanitize _ (Eql _ _) _) = λx(x)
+(Func.Sanitize _ (Eql _ _) _) =
+  λx(x)
 // // Declarations of types (e.g. Bool : Type) are not to be compiled, only their constructors
 // (Func.Sanatize _ Typ _) =
 //   λx(x)
-// Return the Func unaltered
-(Func.Sanitize lhs.t lhs.r rules) = λx((Cons.Go (Func lhs.t lhs.r rules)) x)
+// Return the Func with its rules sanitized
+(Func.Sanitize lhs.t lhs.r rules) =
+  let rules = (Rules.Sanitize rules)
+  λx((Cons.Go (Func lhs.t lhs.r rules)) x)
 
+// (Rules.Sanitize RuleList): RuleList
+(Rules.Sanitize End) =
+  End
+(Rules.Sanitize (Rule lhs rhs rules)) =
+  let lhs = (Rules.Sanitize.LHS lhs)
+  (Rule lhs rhs (Rules.Sanitize rules))
+
+  (Rules.Sanitize.LHS (Cts ctid args)) =
+    (Cts ctid (Rules.Sanitize.Args args))
+
+  (Rules.Sanitize.Args Nil) =
+    Nil
+  (Rules.Sanitize.Args (Cons (Use name n) args)) =
+    let arg = (U32.If (== n 0)
+      (Use (Name.Make "~") 0)
+      (Use name n)
+    )
+    (Cons arg (Rules.Sanitize.Args args))
+
+  (Rules.Sanitize.Args (Cons arg args)) =
+    (Cons arg (Rules.Sanitize.Args args))
 
 (File.Compile file func_list) =
   let func_list = (File.Sanitize func_list file)
+  // func_list
   ((File.Compile.Go func_list file) "")
 
   (File.Compile.Go Nil file) =
@@ -2296,3 +2319,20 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
   (Kind2.CompileKDL code)
   // (Kind2.CompileKDL Test.0)
+
+
+// (Func
+//   (Cts (Name "Bar" 66547) [(Ann (Var (Name "n" 110)) (U32))])
+//   (U32)
+  
+//   (Rule
+//     (Cts (Name "Bar" 66547) [(Use (Name "x" 120) 0)])
+//     (N32 20)
+//   (Rule
+//     (Cts (Name "Bar" 66547) [(N32 1)])
+//     (N32 10)
+//   (Rule
+//     (Cts (Name "Bar" 66547) [(N32 0)])
+//     (N32 0)
+//   (End))))
+// )
