@@ -1753,12 +1753,14 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Term.Compile.Go.Cts.Args args file)
       ((String.Show.Go rgt)
       x))))))
-  (Term.Compile.Go (Eql val0 val1) file ident) =
-    λx(x)
-  (Term.Compile.Go (Rfl expr) file ident) =
-    λx(x)
-  (Term.Compile.Go (Rwt name witn goal expr) file ident) =
-    λx(x)
+  //* Eql, Rfl and Rwt will never be compiled, cause K-HVM have no theorems
+  //* Should these Compile.Go be deleted, or print some kind of error?
+  // (Term.Compile.Go (Eql val0 val1) file ident) =
+  //   λx(x)
+  // (Term.Compile.Go (Rfl expr) file ident) =
+  //   λx(x)
+  // (Term.Compile.Go (Rwt name witn goal expr) file ident) =
+  //   λx(x)
   (Term.Compile.Go (Dup name0 name1 expr body) file ident) =
     λx((String.Show.Go "dup ")
       ((String.Show.Go (Name.GetString name0))
@@ -1965,9 +1967,22 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 // (like convert unused variables to ~, dupping, removing Theorems)
 // should actually be done inside a Sanitize function,
 // and the return from Sanitize is then compiled
-(File.Compile file term_list) =
-  // let term_list = (Term.Sanitize term_list)
-  ((File.Compile.Go term_list file) "")
+(Cons.Go x) = λxs(Cons x xs)
+
+(File.Sanitize Nil file) =
+  Nil
+(File.Sanitize (Cons (Func lhs.t lhs.r rules) terms) file) =
+  ((Term.Sanitize lhs.t lhs.r rules) (File.Sanitize terms file))
+
+// Funcs that return an Equal (Eql) are theorems, and should not be compiled
+(Term.Sanitize _ (Eql _ _) _) = λx(x)
+// Return the Func unaltered
+(Term.Sanitize lhs.t lhs.r rules) = λx((Cons.Go (Func lhs.t lhs.r rules)) x)
+
+
+(File.Compile file func_list) =
+  let func_list = (File.Sanitize func_list file)
+  ((File.Compile.Go func_list file) "")
 
   (File.Compile.Go Nil file) =
     λz(z)
@@ -1975,11 +1990,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λz((Func.Compile.Go func  file)
       ((File.Compile.Go funcs file)
       z))
-
-  // Funcs that return an Equal (Eql) are theorems, and should not be compiled
-  (Func.Compile.Go (Func _ (Eql _ _) rules) file) =
-    λz(z)
-
 
   // // Declarations of types (e.g. Bool : Type) are not to be compiled, only their constructors
   // (Func.Compile.Go (Func _ Typ rules) file) =
@@ -2171,12 +2181,12 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
 (Kind2.CompileKDL code) = (Kind2.CompileKDL.Go (File.Read code))
   (Kind2.CompileKDL.Go (Er  err                 )) = err
-  (Kind2.CompileKDL.Go (Ok (Pair file term_list))) =
-    let has_goals = (File.FindGol term_list)
-    (Kind2.CompileKDL.Go2 has_goals file term_list)
+  (Kind2.CompileKDL.Go (Ok (Pair file func_list))) =
+    let has_goals = (File.FindGol func_list)
+    (Kind2.CompileKDL.Go2 has_goals file func_list)
 
-    (Kind2.CompileKDL.Go2 1 file term_list) = (Error "A file with Goals can't be compiled to KDL")
-    (Kind2.CompileKDL.Go2 0 file term_list) = (File.Compile file term_list)
+    (Kind2.CompileKDL.Go2 1 file func_list) = (Error "A file with Goals can't be compiled to KDL")
+    (Kind2.CompileKDL.Go2 0 file func_list) = (File.Compile file func_list)
 
 (File.NameToFunc file name) = (Pair.Snd (File.GotFunc file (Ctr.GetId (Term.Read file name))))
 
@@ -2216,6 +2226,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (Bool.DNT b:Bool) : {(Bool.Not (Bool.Not b)) == b}
       (Bool.DNT True)  = refl True
       (Bool.DNT False) = refl False
+
+    // Add two numbers
+    (Nat.Add a:Nat b:Nat) : Nat
+      (Nat.Add Zero b) = b
+      (Nat.Add (Succ a) b) = (Nat.Add a (Succ b))
 
     // Doubles a number
     (Nat.Double n:Nat) : Nat
@@ -2267,16 +2282,15 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
         let a = (* (+ (Bar 1) 1) 2)
         // let b = λx (+ a x)
         let b = a
-        (+ a (+ b b))
+        (Nat.Add n n)
   `
 
   let file = (GetFile (File.Read code))
   let func = (GetMaybe (File.NameToFunc file "Main"))
-  (File.Compile file [func])
-  // func
   // let term = (Rules.RHS (Func.GetRules func))
+  // func
+  // (File.Compile file [func])
   // [term NewLine (Term.Compile file term)]
 
-  // (Kind2.CompileKDL code)
+  (Kind2.CompileKDL code)
   // (Kind2.CompileKDL Test.0)
-  // (File.Show file)

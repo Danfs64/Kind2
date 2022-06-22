@@ -7,12 +7,16 @@
 ## Dúvidas relacionadas a arrancar código inútil/repetido
 
 * As coisas que printam tipos primitivos (`Type` e `U32`) podem só ser purgadas | reduzidos a `@x(x)`?
+* Comentário nos Compile.Go de Eql-Rwt-Rfl: Tirar o código ou printar um erro?
 * Kdl não é tipada, mas talvez faça sentido ter construtores pros tipos?
   * Ex.: Funções/Ctrs que recebam um Type como arg, que não seja pra tipar outros args?
 
 ## TODO
 
 * FLATTENER
-* Variáveis usadas múltiplas vezes precisam ser `dup`adas
+* Sanitizer:
+  * Variáveis usadas múltiplas vezes precisam ser `dup`adas
+  * Só fazer os dups depois de apagar os lets não usados: evita dups inúteis
+  * Trocar variáveis não usadas por ~
 * Como definir o Initial State de uma Função?
   * Proposta do Kelvin: Para toda função `foo`, existir um `foo.state` - de aridade 0 - declarando o initial state
