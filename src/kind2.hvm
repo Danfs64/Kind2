@@ -1967,17 +1967,23 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 // (like convert unused variables to ~, dupping, removing Theorems)
 // should actually be done inside a Sanitize function,
 // and the return from Sanitize is then compiled
+// (Cons.Go T): List<T> -> List<T>
 (Cons.Go x) = λxs(Cons x xs)
 
+// (File.Sanatize List<Func> File): List<Func>
 (File.Sanitize Nil file) =
   Nil
 (File.Sanitize (Cons (Func lhs.t lhs.r rules) terms) file) =
-  ((Term.Sanitize lhs.t lhs.r rules) (File.Sanitize terms file))
+  ((Func.Sanitize lhs.t lhs.r rules) (File.Sanitize terms file))
 
+// (Func.Sanatize Term Term RuleList): List<Func> -> List<Func>
 // Funcs that return an Equal (Eql) are theorems, and should not be compiled
-(Term.Sanitize _ (Eql _ _) _) = λx(x)
+(Func.Sanitize _ (Eql _ _) _) = λx(x)
+// // Declarations of types (e.g. Bool : Type) are not to be compiled, only their constructors
+// (Func.Sanatize _ Typ _) =
+//   λx(x)
 // Return the Func unaltered
-(Term.Sanitize lhs.t lhs.r rules) = λx((Cons.Go (Func lhs.t lhs.r rules)) x)
+(Func.Sanitize lhs.t lhs.r rules) = λx((Cons.Go (Func lhs.t lhs.r rules)) x)
 
 
 (File.Compile file func_list) =
@@ -1990,10 +1996,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λz((Func.Compile.Go func  file)
       ((File.Compile.Go funcs file)
       z))
-
-  // // Declarations of types (e.g. Bool : Type) are not to be compiled, only their constructors
-  // (Func.Compile.Go (Func _ Typ rules) file) =
-  //   λz(z)
 
   // If a Func has no rules, per File.IsCtr, it is a Constructor
   (Func.Compile.Go (Func lhs.t lhs.r End) file) =
