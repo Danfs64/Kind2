@@ -1807,6 +1807,141 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx((Term.Compile.Go (Term.Duplicator name expr body n) file ident)
       x)
 
+  (Oper.Compile.Go ADD) = (String.Show.Go "+")
+  (Oper.Compile.Go SUB) = (String.Show.Go "-")
+  (Oper.Compile.Go MUL) = (String.Show.Go "*")
+  (Oper.Compile.Go DIV) = (String.Show.Go "/")
+  (Oper.Compile.Go MOD) = (String.Show.Go "%")
+  (Oper.Compile.Go AND) = (String.Show.Go "&")
+  (Oper.Compile.Go OR)  = (String.Show.Go "|")
+  (Oper.Compile.Go XOR) = (String.Show.Go "^")
+  (Oper.Compile.Go SHL) = (String.Show.Go "<<")
+  (Oper.Compile.Go SHR) = (String.Show.Go ">>")
+  (Oper.Compile.Go LTN) = (String.Show.Go "<")
+  (Oper.Compile.Go LTE) = (String.Show.Go "<=")
+  (Oper.Compile.Go EQL) = (String.Show.Go "==")
+  (Oper.Compile.Go GTE) = (String.Show.Go ">=")
+  (Oper.Compile.Go GTN) = (String.Show.Go ">")
+  (Oper.Compile.Go NEQ) = (String.Show.Go "!=")
+
+(File.Compile file func_list) =
+  let func_list = (File.Sanitize func_list file)
+  // func_list
+  ((File.Compile.Go func_list file) "")
+
+  (File.Compile.Go Nil file) =
+    λz(z)
+  (File.Compile.Go (Cons func funcs) file) =
+    λz((Func.Compile.Go func  file)
+      ((File.Compile.Go funcs file)
+      z))
+
+  // If a Func has no rules, per File.IsCtr, it is a Constructor
+  (Func.Compile.Go (Func lhs.t lhs.r End) file) =
+    λz((String.Show.Go "ctr ")
+      ((Term.Compile.Go lhs.t file "")
+      ((String.Show.Go NewLine)
+      z)))
+
+  // Otherwise, it is a Function
+  (Func.Compile.Go (Func lhs.t lhs.r rules) file) =
+    let rrs = (Rules.Reverse rules)
+    λz((String.Show.Go "fun ")
+      ((Term.Compile.Go lhs.t file "")
+      ((String.Show.Go " {")
+      ((Rules.Compile.Go rrs file "  ")
+      ((String.Show.Go "} = #0")
+      ((String.Show.Go NewLine)
+      ((String.Show.Go NewLine)
+      z)))))))
+
+  // Reverse a list of Rules
+  (Rules.Reverse rs) = (Rules.Reverse.Go rs End)
+    (Rules.Reverse.Go  End              ys) = ys
+    (Rules.Reverse.Go (Rule lhs rhs rs) ys) = (Rules.Reverse.Go rs (Rule lhs rhs ys))
+
+  (Rules.Compile.Go End file ident) =
+    λx(x)
+  (Rules.Compile.Go (Rule lhs rhs rules) file ident) =
+    let nxt_ident = (String.Concat "  " ident)
+    λx((String.Show.Go NewLine)
+      ((String.Show.Go ident)
+      ((Term.Compile.Go lhs file ident)
+      ((String.Show.Go " =")
+      ((String.Show.Go NewLine)
+      ((String.Show.Go nxt_ident)
+      ((Term.Compile.Go rhs file nxt_ident)
+      ((String.Show.Go NewLine)
+      ((Rules.Compile.Go rules file ident)
+      x)))))))))
+
+  (String.Show.Go xs) =
+    λx(String.Concat xs x)
+
+// Sanitizer
+// =========
+
+// (Cons.Go T): (List T) -> (List T)
+(Cons.Go x) = λxs(Cons x xs)
+
+// (File.Sanatize (List Func) File): (List Func)
+(File.Sanitize Nil file) =
+  Nil
+(File.Sanitize (Cons (Func lhs.t lhs.r rules) terms) file) =
+  ((Func.Sanitize lhs.t lhs.r rules) (File.Sanitize terms file))
+
+// (Func.Sanatize Term Term RuleList): (List Func) -> (List Func)
+// Funcs that return an Equal (Eql) are theorems, and should not be compiled
+(Func.Sanitize _ (Eql _ _) _) =
+  λx(x)
+//? Should declarations of types (e.g. Bool: Type) be ignored?
+// (Func.Sanatize _ Typ _) =
+//   λx(x)
+// Return the Func with its rules sanitized
+(Func.Sanitize lhs.t lhs.r rules) =
+  let san_rules = (Rules.Sanitize rules)
+  λx((Cons.Go (Func lhs.t lhs.r san_rules)) x)
+
+// (Rules.Sanitize RuleList): RuleList
+(Rules.Sanitize End) =
+  End
+(Rules.Sanitize (Rule lhs rhs rules)) =
+  let new_sides = (Rules.Sanitize.Sides lhs rhs)
+  (Pair.Get new_sides λnew_lhs λnew_rhs
+  (Rule new_lhs new_rhs (Rules.Sanitize rules)))
+
+  // (Rules. Sanitize.Sides Term Term): (Pair Term Term)
+  (Rules.Sanitize.Sides (Cts ctid args) rhs) =
+    let new = (Rules.Sanitize.Args args rhs)
+    (Pair.Get new λnew_args λnew_rhs
+    (Pair (Cts ctid new_args) new_rhs))
+
+  // (Rules.Sanitize.Args (List Term) Term): (Pair (List Term) Term)
+  (Rules.Sanitize.Args Nil rhs) =
+    (Pair Nil rhs)
+  (Rules.Sanitize.Args (Cons (Use name n) args) rhs) =
+    let new_use  = (Rules.Sanitize.Use name n rhs)
+    let new_name = (Pair.Fst new_use)
+    let new_rhs  = (Pair.Snd new_use)
+    let rec = (Rules.Sanitize.Args args new_rhs)
+    (Pair.Get rec λrec_args λrec_rhs
+    (Pair (Cons (Use new_name n) rec_args) rec_rhs))
+
+  (Rules.Sanitize.Args (Cons arg args) rhs) =
+    let rec = (Rules.Sanitize.Args args rhs)
+    (Pair.Get rec λrec_args λrec_rhs
+    (Pair (Cons arg rec_args) rec_rhs))
+
+  // (Rules.Sanitize.Use Name U32 Term): (Pair Name Term)
+  (Rules.Sanitize.Use name 0 rhs) =
+    (Pair (Name.Make "~") rhs)
+  (Rules.Sanitize.Use name 1 rhs) =
+    (Pair name rhs)
+  (Rules.Sanitize.Use name n rhs) =
+    let new_rhs = (Term.Duplicator name (Var name) rhs n)
+    (Pair name new_rhs)
+
+
   // Searches for `name` inside `body`. Substitutes it for `expr`
   // (Term.Replace name:Name expr:Term body:Term): Term
   (Term.Replace name expr (Var v_name)) =
@@ -1939,142 +2074,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
     (Term.Duplicator.UpdateBody.Go name body i) =
       (Pair i body)
-
-  (Oper.Compile.Go ADD) = (String.Show.Go "+")
-  (Oper.Compile.Go SUB) = (String.Show.Go "-")
-  (Oper.Compile.Go MUL) = (String.Show.Go "*")
-  (Oper.Compile.Go DIV) = (String.Show.Go "/")
-  (Oper.Compile.Go MOD) = (String.Show.Go "%")
-  (Oper.Compile.Go AND) = (String.Show.Go "&")
-  (Oper.Compile.Go OR)  = (String.Show.Go "|")
-  (Oper.Compile.Go XOR) = (String.Show.Go "^")
-  (Oper.Compile.Go SHL) = (String.Show.Go "<<")
-  (Oper.Compile.Go SHR) = (String.Show.Go ">>")
-  (Oper.Compile.Go LTN) = (String.Show.Go "<")
-  (Oper.Compile.Go LTE) = (String.Show.Go "<=")
-  (Oper.Compile.Go EQL) = (String.Show.Go "==")
-  (Oper.Compile.Go GTE) = (String.Show.Go ">=")
-  (Oper.Compile.Go GTN) = (String.Show.Go ">")
-  (Oper.Compile.Go NEQ) = (String.Show.Go "!=")
-
-
-  (String.Show.Go xs) =
-    λx(String.Concat xs x)
-
-// Sanitizer
-// =========
-
-// (Cons.Go T): (List T) -> (List T)
-(Cons.Go x) = λxs(Cons x xs)
-
-// (File.Sanatize (List Func) File): (List Func)
-(File.Sanitize Nil file) =
-  Nil
-(File.Sanitize (Cons (Func lhs.t lhs.r rules) terms) file) =
-  ((Func.Sanitize lhs.t lhs.r rules) (File.Sanitize terms file))
-
-// (Func.Sanatize Term Term RuleList): (List Func) -> (List Func)
-// Funcs that return an Equal (Eql) are theorems, and should not be compiled
-(Func.Sanitize _ (Eql _ _) _) =
-  λx(x)
-//? Should declarations of types (e.g. Bool: Type) be ignored?
-// (Func.Sanatize _ Typ _) =
-//   λx(x)
-// Return the Func with its rules sanitized
-(Func.Sanitize lhs.t lhs.r rules) =
-  let san_rules = (Rules.Sanitize rules)
-  λx((Cons.Go (Func lhs.t lhs.r san_rules)) x)
-
-// (Rules.Sanitize RuleList): RuleList
-(Rules.Sanitize End) =
-  End
-(Rules.Sanitize (Rule lhs rhs rules)) =
-  let new_sides = (Rules.Sanitize.Sides lhs rhs)
-  (Pair.Get new_sides λnew_lhs λnew_rhs
-  (Rule new_lhs new_rhs (Rules.Sanitize rules)))
-
-  // (Rules. Sanitize.Sides Term Term): (Pair Term Term)
-  (Rules.Sanitize.Sides (Cts ctid args) rhs) =
-    let new = (Rules.Sanitize.Args args rhs)
-    (Pair.Get new λnew_args λnew_rhs
-    (Pair (Cts ctid new_args) new_rhs))
-
-  // (Rules.Sanitize.Args (List Term) Term): (Pair (List Term) Term)
-  (Rules.Sanitize.Args Nil rhs) =
-    (Pair Nil rhs)
-  (Rules.Sanitize.Args (Cons (Use name n) args) rhs) =
-    let new_use  = (Rules.Sanitize.Use name n rhs)
-    let new_name = (Pair.Fst new_use)
-    let new_rhs  = (Pair.Snd new_use)
-    let rec = (Rules.Sanitize.Args args new_rhs)
-    (Pair.Get rec λrec_args λrec_rhs
-    (Pair (Cons (Use new_name n) rec_args) rec_rhs))
-
-  (Rules.Sanitize.Args (Cons arg args) rhs) =
-    let rec = (Rules.Sanitize.Args args rhs)
-    (Pair.Get rec λrec_args λrec_rhs
-    (Pair (Cons arg rec_args) rec_rhs))
-
-  // (Rules.Sanitize.Use Name U32 Term): (Pair Name Term)
-  (Rules.Sanitize.Use name 0 rhs) =
-    (Pair (Name.Make "~") rhs)
-  (Rules.Sanitize.Use name 1 rhs) =
-    (Pair name rhs)
-  (Rules.Sanitize.Use name n rhs) =
-    let new_rhs = (Term.Duplicator name (Var name) rhs n)
-    (Pair name new_rhs)
-
-(File.Compile file func_list) =
-  let func_list = (File.Sanitize func_list file)
-  // func_list
-  ((File.Compile.Go func_list file) "")
-
-  (File.Compile.Go Nil file) =
-    λz(z)
-  (File.Compile.Go (Cons func funcs) file) =
-    λz((Func.Compile.Go func  file)
-      ((File.Compile.Go funcs file)
-      z))
-
-  // If a Func has no rules, per File.IsCtr, it is a Constructor
-  (Func.Compile.Go (Func lhs.t lhs.r End) file) =
-    λz((String.Show.Go "ctr ")
-      ((Term.Compile.Go lhs.t file "")
-      ((String.Show.Go NewLine)
-      z)))
-
-  // Otherwise, it is a Function
-  (Func.Compile.Go (Func lhs.t lhs.r rules) file) =
-    let rrs = (Rules.Reverse rules)
-    λz((String.Show.Go "fun ")
-      ((Term.Compile.Go lhs.t file "")
-      ((String.Show.Go " {")
-      ((Rules.Compile.Go rrs file "  ")
-      ((String.Show.Go "} = #0")
-      ((String.Show.Go NewLine)
-      ((String.Show.Go NewLine)
-      z)))))))
-
-  // Reverse a list of Rules
-  (Rules.Reverse rs) = (Rules.Reverse.Go rs End)
-    (Rules.Reverse.Go  End              ys) = ys
-    (Rules.Reverse.Go (Rule lhs rhs rs) ys) = (Rules.Reverse.Go rs (Rule lhs rhs ys))
-
-  (Rules.Compile.Go End file ident) =
-    λx(x)
-  (Rules.Compile.Go (Rule lhs rhs rules) file ident) =
-    let nxt_ident = (String.Concat "  " ident)
-    λx((String.Show.Go NewLine)
-      ((String.Show.Go ident)
-      ((Term.Compile.Go lhs file ident)
-      ((String.Show.Go " =")
-      ((String.Show.Go NewLine)
-      ((String.Show.Go nxt_ident)
-      ((Term.Compile.Go rhs file nxt_ident)
-      ((String.Show.Go NewLine)
-      ((Rules.Compile.Go rules file ident)
-      x)))))))))
-
 
 // TODO This looks unefficient, there should be a better way
 (File.FindGol  Nil) = 0
