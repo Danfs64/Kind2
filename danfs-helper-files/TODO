@@ -15,6 +15,8 @@
 
 * FLATTENER
 * Sanitizer:
+  * Trocar lambdas não usados para ~
+    * Existe a chance de usar uma variavel de lambda multiplas vezes? (@x(+ x x))?
   * Só fazer os dups depois de apagar os lets não usados: evita dups inúteis
 * Como definir o Initial State de uma Função?
   * Proposta do Kelvin: Para toda função `foo`, existir um `foo.state` - de aridade 0 - declarando o initial state
