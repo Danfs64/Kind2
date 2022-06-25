@@ -1912,17 +1912,14 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (Let name (Rules.Sanitize.RHS expr) (Rules.Sanitize.RHS body))
   // Renames unused lambda vars to "~"
   (Rules.Sanitize.RHS (Lam name body)) =
-    let new_name = (Rules.Sanitize.LamName name body)
-    (Lam new_name (Rules.Sanitize.RHS body))
-  (Rules.Sanitize.RHS rhs) =
-    rhs
-
-  (Rules.Sanitize.LamName name body) =
-    let uses = (Uses name body)
-    (U32.If (== uses 0)
+    let new_name = (U32.If
+      (== (Uses name body) 0)
       (Name.Make "~")
       (name)
     )
+    (Lam new_name (Rules.Sanitize.RHS body))
+  (Rules.Sanitize.RHS rhs) =
+    rhs
 
   // (Rules.Sanitize.Args (List Term) Term): (Pair (List Term) Term)
   (Rules.Sanitize.Args Nil rhs) =
