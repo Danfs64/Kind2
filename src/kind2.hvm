@@ -1732,7 +1732,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   // TODO Talvez colocar o body entre parenteses aqui (body do tipo U32 compila sem parenteses)
   (Term.Compile.Go (Lam name body) file ident) =
     λx((String.Show.Go "@")
-      ((Term.Compile.Go.LamName (Lam name body))
+      ((String.Show.Go (Name.GetString name))
       ((String.Show.Go " ")
       ((Term.Compile.Go body file "")
       x))))
@@ -1784,17 +1784,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Term.Compile.Go arg file "")
       ((Term.Compile.Go.Cts.Args args file)
       x)))
-
-  (Term.Compile.Go.LamName (Lam name body)) =
-    let uses = (Uses name body)
-    (Term.Compile.Go.VarName uses name)
-
-    (Term.Compile.Go.VarName 0 name) =
-      λx((String.Show.Go "~")
-        x)
-    (Term.Compile.Go.VarName n name) =
-      λx((String.Show.Go (Name.GetString name))
-        x)
 
   (Term.Compile.Go.Let 0 (Let name expr body) file ident) =
     λx((Term.Compile.Go body file ident)
@@ -1912,9 +1901,28 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
   // (Rules. Sanitize.Sides Term Term): (Pair Term Term)
   (Rules.Sanitize.Sides (Cts ctid args) rhs) =
-    let new = (Rules.Sanitize.Args args rhs)
+    let san_rhs = (Rules.Sanitize.RHS rhs)
+    let new     = (Rules.Sanitize.Args args san_rhs)
     (Pair.Get new λnew_args λnew_rhs
     (Pair (Cts ctid new_args) new_rhs))
+
+  // (Rules.Sanitize.RHS Term): Term
+  // TODO Check `let` usage here (not used || needs dupping)
+  (Rules.Sanitize.RHS (Let name expr body)) =
+    (Let name (Rules.Sanitize.RHS expr) (Rules.Sanitize.RHS body))
+  // Renames unused lambda vars to "~"
+  (Rules.Sanitize.RHS (Lam name body)) =
+    let new_name = (Rules.Sanitize.LamName name body)
+    (Lam new_name (Rules.Sanitize.RHS body))
+  (Rules.Sanitize.RHS rhs) =
+    rhs
+
+  (Rules.Sanitize.LamName name body) =
+    let uses = (Uses name body)
+    (U32.If (== uses 0)
+      (Name.Make "~")
+      (name)
+    )
 
   // (Rules.Sanitize.Args (List Term) Term): (Pair (List Term) Term)
   (Rules.Sanitize.Args Nil rhs) =
@@ -2032,22 +2040,24 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
     (Term.Duplicator.UpdateBody.Go name (Let l_name expr body) i) =
       let rec = (Term.Duplicator.UpdateBody.Go name expr i)
+      let eql = (Name.Equal name l_name)
       (Pair.Get rec λrec_i λrec_expr
-      (Term.Duplicator.UpdateBody.Go.Let (Name.Equal name l_name) name (Let l_name rec_expr body) rec_i))
+      (Term.Duplicator.UpdateBody.Go.Let eql name (Let l_name rec_expr body) rec_i))
 
-      (Term.Duplicator.UpdateBody.Go.Let 1 name (Let l_name expr body) i) =
+      (Term.Duplicator.UpdateBody.Go.Let 1   name (Let l_name expr body) i) =
         (Pair i (Let l_name expr body))
-      (Term.Duplicator.UpdateBody.Go.Let 0 name (Let l_name expr body) i) =
+      (Term.Duplicator.UpdateBody.Go.Let 0   name (Let l_name expr body) i) =
         let rec = (Term.Duplicator.UpdateBody.Go name body i)
         (Pair.Get rec λrec_i λrec_body
         (Pair rec_i (Let l_name expr rec_body)))
 
     (Term.Duplicator.UpdateBody.Go name (Lam l_name body) i) =
-      (Term.Duplicator.UpdateBody.Go.Lam (Name.Equal name l_name) name (Lam l_name body) i)
+      let eql = (Name.Equal name l_name)
+      (Term.Duplicator.UpdateBody.Go.Lam eql name (Lam l_name body) i)
 
-      (Term.Duplicator.UpdateBody.Go.Lam 1 name (Lam l_name body) i) =
+      (Term.Duplicator.UpdateBody.Go.Lam 1   name (Lam l_name body) i) =
         (Pair i (Lam l_name body))
-      (Term.Duplicator.UpdateBody.Go.Lam 0 name (Lam l_name body) i) =
+      (Term.Duplicator.UpdateBody.Go.Lam 0   name (Lam l_name body) i) =
         let rec = (Term.Duplicator.UpdateBody.Go name body i)
         (Pair.Get rec λrec_i λrec_body
         (Pair rec_i (Lam l_name rec_body)))
@@ -2071,6 +2081,12 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       let rec = (Term.Duplicator.UpdateBody.Go name tail (Pair.Fst new_head))
       (Pair.Get rec λrec_i λrec_tail
       (Pair rec_i (Cons (Pair.Snd new_head) rec_tail)))
+
+    //TODO Check if this is right, or even necessary
+    // (Term.Duplicator.UpdateBody.Go name (Dup name0 name1 expr body) i) =
+    //   let rec = (Term.Duplicator.UpdateBody.Go name body i)
+    //   (Pair.Get rec λrec_i λrec_body
+    //   (Pair rec_i (Dup name0 name1 expr rec_body)))
 
     (Term.Duplicator.UpdateBody.Go name body i) =
       (Pair i body)
@@ -2320,34 +2336,18 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       // Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
       (Main n) =
         let a = (* (+ (Bar 1) 1) 2)
-        // let b = λx (+ a x)
-        let b = a
-        (Nat.Add n n)
+        let b = λx (+ n n)
+        // let b = (+ n n)
+        // (Nat.Add b b)
+        b
   `
 
   let file = (GetFile (File.Read code))
   let func = (GetMaybe (File.NameToFunc file "Main"))
-  // let term = (Rules.RHS (Func.GetRules func))
+  let term = (Rules.RHS (Func.GetRules func))
   // func
   // (File.Compile file [func])
   // [term NewLine (Term.Compile file term)]
 
   (Kind2.CompileKDL code)
   // (Kind2.CompileKDL Test.0)
-
-
-// (Func
-//   (Cts (Name "Bar" 66547) [(Ann (Var (Name "n" 110)) (U32))])
-//   (U32)
-  
-//   (Rule
-//     (Cts (Name "Bar" 66547) [(Use (Name "x" 120) 0)])
-//     (N32 20)
-//   (Rule
-//     (Cts (Name "Bar" 66547) [(N32 1)])
-//     (N32 10)
-//   (Rule
-//     (Cts (Name "Bar" 66547) [(N32 0)])
-//     (N32 0)
-//   (End))))
-// )
