@@ -2028,12 +2028,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (Term.Duplicator.UpdateBody.Go name (O32 oper val0 val1) i) =
       let lft = (Term.Duplicator.UpdateBody.Go name val0 i)
       (Pair.Get lft λlft_i λlft_body
-      (Term.Duplicator.UpdateBody.Go.O32 name (O32 oper lft_body val1) lft_i))
-
-      (Term.Duplicator.UpdateBody.Go.O32 name (O32 oper val0 val1) i) =
-        let rgt = (Term.Duplicator.UpdateBody.Go name val1 i)
-        (Pair.Get rgt λrgt_i λrgt_body
-        (Pair rgt_i (O32 oper val0 rgt_body)))
+      (let rgt = (Term.Duplicator.UpdateBody.Go name val1 lft_i)
+      (Pair.Get rgt λrgt_i λrgt_body
+      (Pair rgt_i (O32 oper lft_body rgt_body)))))
 
     (Term.Duplicator.UpdateBody.Go name (Let l_name expr body) i) =
       let rec = (Term.Duplicator.UpdateBody.Go name expr i)
@@ -2060,24 +2057,21 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
         (Pair rec_i (Lam l_name rec_body)))
 
     (Term.Duplicator.UpdateBody.Go name (App func argm) i) =
-      let rec = (Term.Duplicator.UpdateBody.Go name func i)
-      (Pair.Get rec λrec_i λrec_func
-      (Term.Duplicator.UpdateBody.Go.App name (App rec_func argm) rec_i))
-
-      (Term.Duplicator.UpdateBody.Go.App name (App func argm) i) =
-        let rec = (Term.Duplicator.UpdateBody.Go name argm i)
-        (Pair.Get rec λrec_i λrec_argm
-        (Pair rec_i (App func rec_argm)))
-
+      let dup_func = (Term.Duplicator.UpdateBody.Go name func i)
+      (Pair.Get dup_func λfunc_i λnew_func
+      (let dup_argm = (Term.Duplicator.UpdateBody.Go name argm func_i)
+      (Pair.Get dup_argm λargm_i λnew_argm
+      (Pair argm_i (App new_func new_argm)))))
     (Term.Duplicator.UpdateBody.Go name (Cts ctid args) i) =
       let rec = (Term.Duplicator.UpdateBody.Go name args i)
       (Pair.Get rec λrec_i λrec_args
       (Pair rec_i (Cts ctid rec_args)))
     (Term.Duplicator.UpdateBody.Go name (Cons head tail) i) =
-      let new_head = (Term.Duplicator.UpdateBody.Go name head i)
-      let rec = (Term.Duplicator.UpdateBody.Go name tail (Pair.Fst new_head))
-      (Pair.Get rec λrec_i λrec_tail
-      (Pair rec_i (Cons (Pair.Snd new_head) rec_tail)))
+      let dup_head = (Term.Duplicator.UpdateBody.Go name head i)
+      (Pair.Get dup_head λhead_i λnew_head
+      (let dup_tail = (Term.Duplicator.UpdateBody.Go name tail head_i)
+      (Pair.Get dup_tail λtail_i λnew_tail
+      (Pair tail_i (Cons new_head new_tail)))))
 
     //TODO Check if this is right, or even necessary
     // (Term.Duplicator.UpdateBody.Go name (Dup name0 name1 expr body) i) =
@@ -2333,10 +2327,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       // Main = (List.Map Nat (List Nat) λx(+ x 5) Nil)
       (Main n) =
         let a = (* (+ (Bar 1) 1) 2)
-        let b = λx (+ n n)
-        // let b = (+ n n)
-        // (Nat.Add b b)
-        b
+        // let b = λx (+ n n)
+        let b = (+ n n)
+        (Nat.Add b b)
+        // b
   `
 
   let file = (GetFile (File.Read code))
