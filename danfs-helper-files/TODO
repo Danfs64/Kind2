@@ -3,7 +3,6 @@
 ## Dúvidas Gerais
 
 * A `Main` do Kind2 deveria virar um `run` no kdl?
-* Existe a chance de usar uma variavel de lambda multiplas vezes? (@x(+ x x))?
 
 ## Dúvidas relacionadas a arrancar código inútil/repetido
 

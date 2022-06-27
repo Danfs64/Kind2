@@ -1870,9 +1870,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 // Sanitizer
 // =========
 
-// (Cons.Go T): (List T) -> (List T)
-(Cons.Go x) = λxs(Cons x xs)
-
+// TODO Maybe `file` is unnecessary
 // (File.Sanatize (List Func) File): (List Func)
 (File.Sanitize Nil file) =
   Nil
@@ -1880,7 +1878,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   ((Func.Sanitize lhs.t lhs.r rules) (File.Sanitize terms file))
 
 // (Func.Sanatize Term Term RuleList): (List Func) -> (List Func)
-// Funcs that return an Equal (Eql) are theorems, and should not be compiled
+// Funcs that return an Equal (Eql) are theorems, and are ignored
 (Func.Sanitize _ (Eql _ _) _) =
   λx(x)
 //? Should declarations of types (e.g. Bool: Type) be ignored?
@@ -1889,7 +1887,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 // Return the Func with its rules sanitized
 (Func.Sanitize lhs.t lhs.r rules) =
   let san_rules = (Rules.Sanitize rules)
-  λx((Cons.Go (Func lhs.t lhs.r san_rules)) x)
+  λx(Cons (Func lhs.t lhs.r san_rules) x)
 
 // (Rules.Sanitize RuleList): RuleList
 (Rules.Sanitize End) =
@@ -1899,7 +1897,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Pair.Get new_sides λnew_lhs λnew_rhs
   (Rule new_lhs new_rhs (Rules.Sanitize rules)))
 
-  // (Rules. Sanitize.Sides Term Term): (Pair Term Term)
+  // (Rules.Sanitize.Sides Term Term): (Pair Term Term)
   (Rules.Sanitize.Sides (Cts ctid args) rhs) =
     let san_rhs = (Rules.Sanitize.RHS rhs)
     let new     = (Rules.Sanitize.Args args san_rhs)
@@ -1907,7 +1905,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (Pair (Cts ctid new_args) new_rhs))
 
   // (Rules.Sanitize.RHS Term): Term
-  // TODO Check `let` usage here (not used || needs dupping)
+  // TODO Check `let` usage here (not used || replace || needs dupping)
   (Rules.Sanitize.RHS (Let name expr body)) =
     (Let name (Rules.Sanitize.RHS expr) (Rules.Sanitize.RHS body))
   // Renames unused lambda vars to "~"
@@ -1961,10 +1959,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (O32 oper lft rgt)
   (Term.Replace name expr (Let l_name l_expr body)) =
     let new_expr = (Term.Replace name expr l_expr)
-    let new_body = (Term.Replace.LetBody (Name.Equal name l_name) name expr body)
+    let new_body = (Term.Replace.If (U32.Not(Name.Equal name l_name)) name expr body)
     (Let l_name new_expr new_body)
   (Term.Replace name expr (Lam l_name body)) =
-    let new_body = (Term.Replace name expr body)
+    let new_body = (Term.Replace.If (U32.Not(Name.Equal name l_name)) name expr body)
     (Lam l_name new_body)
   (Term.Replace name expr (App func argm)) =
     let new_func = (Term.Replace name expr func)
@@ -1980,9 +1978,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Replace name expr body) =
     body
 
-  (Term.Replace.LetBody 1 name expr body) =
+  (Term.Replace.If 0 name expr body) =
     body
-  (Term.Replace.LetBody 0 name expr body) =
+  (Term.Replace.If 1 name expr body) =
     (Term.Replace name expr body)
 
 
@@ -2062,10 +2060,12 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (let dup_argm = (Term.Duplicator.UpdateBody.Go name argm func_i)
       (Pair.Get dup_argm λargm_i λnew_argm
       (Pair argm_i (App new_func new_argm)))))
+
     (Term.Duplicator.UpdateBody.Go name (Cts ctid args) i) =
       let rec = (Term.Duplicator.UpdateBody.Go name args i)
       (Pair.Get rec λrec_i λrec_args
       (Pair rec_i (Cts ctid rec_args)))
+
     (Term.Duplicator.UpdateBody.Go name (Cons head tail) i) =
       let dup_head = (Term.Duplicator.UpdateBody.Go name head i)
       (Pair.Get dup_head λhead_i λnew_head
