@@ -2107,9 +2107,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
 (Func.FindGol (Func _ _ rules)) = (Rules.FindGol rules)
 (Rules.FindGol (End)) = 0
-(Rules.FindGol (Rule _ (Gol name    ) rules)) = 1
-(Rules.FindGol (Rule _ (Let _ _ body) rules)) = (Rules.FindGol (Rule _ body rules))
-(Rules.FindGol (Rule _ rhs            rules)) = (Rules.FindGol rules)
+(Rules.FindGol (Rule _ (Gol       name) rules)) = 1
+(Rules.FindGol (Rule _ (Lam _     body) rules)) = (Rules.FindGol (Rule _ body rules))
+(Rules.FindGol (Rule _ (Let _ _   body) rules)) = (Rules.FindGol (Rule _ body rules))
+(Rules.FindGol (Rule _ (Dup _ _ _ body) rules)) = (Rules.FindGol (Rule _ body rules))
+(Rules.FindGol (Rule _ rhs              rules)) = (Rules.FindGol rules)
 
 
 // #############################################################################
