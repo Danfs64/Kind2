@@ -1978,12 +1978,8 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     let new_argm = (Term.Replace name expr argm)
     (App new_func new_argm)
   (Term.Replace name expr (Cts ctid args)) =
-    let new_args = (Term.Replace name expr args)
+    let new_args = (Term.Replace.Args name expr args)
     (Cts ctid new_args)
-  (Term.Replace name expr (Cons x xs)) =
-    let head = (Term.Replace name expr x)
-    let tail = (Term.Replace name expr xs)
-    (Cons head tail)
   (Term.Replace name expr (Dup name0 name1 d_expr body)) =
     let new_expr = (Term.Replace name expr d_expr)
     let new_body = (Term.Replace name expr body)
@@ -1991,6 +1987,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Replace name expr body) =
     body
 
+  (Term.Replace.Args name expr (Cons x xs)) =
+    let head = (Term.Replace name expr x)
+    let tail = (Term.Replace name expr xs)
+    (Cons head tail)
   (Term.Replace.If 0 name expr body) =
     body
   (Term.Replace.If 1 name expr body) =
@@ -2075,16 +2075,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (Pair argm_i (App new_func new_argm)))))
 
     (Term.Duplicator.UpdateBody.Go name (Cts ctid args) i) =
-      let rec = (Term.Duplicator.UpdateBody.Go name args i)
+      let rec = (Term.Duplicator.UpdateBody.Go.Args name args i)
       (Pair.Get rec λrec_i λrec_args
       (Pair rec_i (Cts ctid rec_args)))
-
-    (Term.Duplicator.UpdateBody.Go name (Cons head tail) i) =
-      let dup_head = (Term.Duplicator.UpdateBody.Go name head i)
-      (Pair.Get dup_head λhead_i λnew_head
-      (let dup_tail = (Term.Duplicator.UpdateBody.Go name tail head_i)
-      (Pair.Get dup_tail λtail_i λnew_tail
-      (Pair tail_i (Cons new_head new_tail)))))
 
     (Term.Duplicator.UpdateBody.Go name (Dup name0 name1 expr body) i) =
       let dup_expr = (Term.Duplicator.UpdateBody.Go name expr i)
@@ -2095,6 +2088,14 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
     (Term.Duplicator.UpdateBody.Go name body i) =
       (Pair i body)
+
+    (Term.Duplicator.UpdateBody.Go.Args name (Cons head tail) i) =
+      let dup_head = (Term.Duplicator.UpdateBody.Go name head i)
+      (Pair.Get dup_head λhead_i λnew_head
+      (let dup_tail = (Term.Duplicator.UpdateBody.Go name tail head_i)
+      (Pair.Get dup_tail λtail_i λnew_tail
+      (Pair tail_i (Cons new_head new_tail)))))
+
 
 // TODO This looks unefficient, there should be a better way
 (File.FindGol  Nil) = 0
