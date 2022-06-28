@@ -1701,8 +1701,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Compile.Go (Hol hash) file ident) =
     λx((String.Show.Go "~")
       x)
-  (Term.Compile.Go (Let name expr body) file ident) =
-    (Term.Compile.Go.Let (Uses name body) (Let name expr body) file ident)
+  // `let`s don't exist in compile. They are removed during Sanitization
+  // (Term.Compile.Go (Let name expr body) file ident) =
+  //   λx(x)
   (Term.Compile.Go (Ann xval xtyp) file ident) =
     λx((Term.Compile.Go xval file ident)
       x)
@@ -1785,17 +1786,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       ((Term.Compile.Go arg file "")
       ((Term.Compile.Go.Cts.Args args file)
       x)))
-
-  (Term.Compile.Go.Let 0 (Let name expr body) file ident) =
-    λx((Term.Compile.Go body file ident)
-      x)
-  (Term.Compile.Go.Let 1 (Let name expr body) file ident) =
-    let new_body = (Term.Replace name expr body)
-    λx((Term.Compile.Go new_body file ident)
-      x)
-  (Term.Compile.Go.Let n (Let name expr body) file ident) =
-    λx((Term.Compile.Go (Term.Duplicator name expr body n) file ident)
-      x)
 
   (Oper.Compile.Go ADD) = (String.Show.Go "+")
   (Oper.Compile.Go SUB) = (String.Show.Go "-")
@@ -1905,9 +1895,20 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (Pair (Cts ctid new_args) new_rhs))
 
   // (Rules.Sanitize.RHS Term): Term
-  // TODO Check `let` usage here (not used || replace || needs dupping)
+  // TODO Figure out a way to remove unused lets before everything else
   (Rules.Sanitize.RHS (Let name expr body)) =
-    (Let name (Rules.Sanitize.RHS expr) (Rules.Sanitize.RHS body))
+    let uses = (Uses name body)
+    (Rules.Sanitize.RHS.Let uses (Let name expr body))
+
+    (Rules.Sanitize.RHS.Let 0 (Let name expr body)) =
+      (Rules.Sanitize.RHS body)
+    (Rules.Sanitize.RHS.Let 1 (Let name expr body)) =
+      let new_body = (Term.Replace name expr body)
+      (Rules.Sanitize.RHS new_body)
+    (Rules.Sanitize.RHS.Let n (Let name expr body)) =
+      let dup_body = (Term.Duplicator name expr body n)
+      (Rules.Sanitize.RHS dup_body)
+
   (Rules.Sanitize.RHS (Lam name body)) =
     let uses = (Uses name body)
     (Rules.Sanitize.RHS.Lam uses (Lam name body))
@@ -1920,6 +1921,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       let dup_body = (Term.Duplicator name (Var name) body n)
       (Lam name (Rules.Sanitize.RHS dup_body))
 
+  (Rules.Sanitize.RHS (Dup name0 name1 expr body)) =
+    let san_expr = (Rules.Sanitize.RHS expr)
+    let san_body = (Rules.Sanitize.RHS body)
+    (Dup name0 name1 san_expr san_body)
+
   (Rules.Sanitize.RHS rhs) =
     rhs
 
@@ -1928,11 +1934,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     (Pair Nil rhs)
   (Rules.Sanitize.Args (Cons (Use name n) args) rhs) =
     let new_use  = (Rules.Sanitize.Use name n rhs)
-    let new_name = (Pair.Fst new_use)
-    let new_rhs  = (Pair.Snd new_use)
-    let rec = (Rules.Sanitize.Args args new_rhs)
+    (Pair.Get new_use λnew_name λnew_rhs
+    (let rec = (Rules.Sanitize.Args args new_rhs)
     (Pair.Get rec λrec_args λrec_rhs
-    (Pair (Cons (Use new_name n) rec_args) rec_rhs))
+    (Pair (Cons (Use new_name n) rec_args) rec_rhs))))
 
   (Rules.Sanitize.Args (Cons arg args) rhs) =
     let rec = (Rules.Sanitize.Args args rhs)
@@ -1979,6 +1984,10 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     let head = (Term.Replace name expr x)
     let tail = (Term.Replace name expr xs)
     (Cons head tail)
+  (Term.Replace name expr (Dup name0 name1 d_expr body)) =
+    let new_expr = (Term.Replace name expr d_expr)
+    let new_body = (Term.Replace name expr body)
+    (Dup name0 name1 new_expr new_body)
   (Term.Replace name expr body) =
     body
 
@@ -2077,11 +2086,12 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       (Pair.Get dup_tail λtail_i λnew_tail
       (Pair tail_i (Cons new_head new_tail)))))
 
-    //TODO Check if this is right, or even necessary
-    // (Term.Duplicator.UpdateBody.Go name (Dup name0 name1 expr body) i) =
-    //   let rec = (Term.Duplicator.UpdateBody.Go name body i)
-    //   (Pair.Get rec λrec_i λrec_body
-    //   (Pair rec_i (Dup name0 name1 expr rec_body)))
+    (Term.Duplicator.UpdateBody.Go name (Dup name0 name1 expr body) i) =
+      let dup_expr = (Term.Duplicator.UpdateBody.Go name expr i)
+      (Pair.Get dup_expr λexpr_i λnew_expr
+      (let dup_body = (Term.Duplicator.UpdateBody.Go name body expr_i)
+      (Pair.Get dup_body λbody_i λnew_body
+      (Pair body_i (Dup name0 name1 new_expr new_body)))))
 
     (Term.Duplicator.UpdateBody.Go name body i) =
       (Pair i body)
@@ -2333,8 +2343,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
         let a = (* (+ (Bar 1) 1) 2)
         // let b = λx (+ n n)
         let b = (+ n n)
-        (Nat.Add b b)
-        // b
+        // let c = (Nat.Double b)
+        (+ b b)
+        // c
   `
 
   let file = (GetFile (File.Read code))
