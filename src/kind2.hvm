@@ -1805,7 +1805,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Oper.Compile.Go NEQ) = (String.Show.Go "!=")
 
 (File.Compile file func_list) =
-  let func_list = (File.Sanitize func_list file)
   ((File.Compile.Go func_list file) "")
 
   (File.Compile.Go Nil file) =
@@ -2244,8 +2243,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 (Kind2.CompileKDL code) = (Kind2.CompileKDL.Go (File.Read code))
   (Kind2.CompileKDL.Go (Er  err                 )) = err
   (Kind2.CompileKDL.Go (Ok (Pair file func_list))) =
-    let has_goals = (File.FindGol func_list)
-    (Kind2.CompileKDL.Go2 has_goals file func_list)
+    let san_funcs = (File.Sanitize func_list file)
+    let has_goals = (File.FindGol san_funcs)
+    (Kind2.CompileKDL.Go2 has_goals file san_funcs)
 
     (Kind2.CompileKDL.Go2 1 file func_list) = (Error "A file with Goals can't be compiled to KDL")
     (Kind2.CompileKDL.Go2 0 file func_list) = (File.Compile file func_list)
