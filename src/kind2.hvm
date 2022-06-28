@@ -1888,10 +1888,22 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
   // (Rules.Sanitize.Sides Term Term): (Pair Term Term)
   (Rules.Sanitize.Sides (Cts ctid args) rhs) =
-    let san_rhs = (Rules.Sanitize.RHS rhs)
+    let san_rhs = (Rules.Sanitize.RemoveUnusedLets rhs)
+    let san_rhs = (Rules.Sanitize.RHS san_rhs)
     let new     = (Rules.Sanitize.Args args san_rhs)
     (Pair.Get new λnew_args λnew_rhs
     (Pair (Cts ctid new_args) new_rhs))
+
+  // (Rules.Sanitize.RemoveUnusedLets Term): Term
+  (Rules.Sanitize.RemoveUnusedLets (Let name expr body)) =
+    let new_body = (Rules.Sanitize.RemoveUnusedLets body)
+    (U32.If (== (Uses name new_body) 0)
+      new_body
+      (Let name expr new_body)
+    )
+
+  (Rules.Sanitize.RemoveUnusedLets rhs) =
+    rhs
 
   // (Rules.Sanitize.RHS Term): Term
   // TODO Figure out a way to remove unused lets before everything else
@@ -1899,8 +1911,9 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     let uses = (Uses name body)
     (Rules.Sanitize.RHS.Let uses (Let name expr body))
 
-    (Rules.Sanitize.RHS.Let 0 (Let name expr body)) =
-      (Rules.Sanitize.RHS body)
+    // Unused Let's are removed before this anyway
+    // (Rules.Sanitize.RHS.Let 0 (Let name expr body)) =
+    //   (Rules.Sanitize.RHS body)
     (Rules.Sanitize.RHS.Let 1 (Let name expr body)) =
       let new_body = (Term.Replace name expr body)
       (Rules.Sanitize.RHS new_body)
@@ -2346,7 +2359,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
         let a = (* (+ (Bar 1) 1) 2)
         // let b = λx (+ n n)
         let b = (+ n n)
-        // let c = (Nat.Double b)
+        let c = (Nat.Double b)
         (+ b b)
         // c
   `
