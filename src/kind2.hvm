@@ -1720,27 +1720,28 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     λx((String.Show.Go "(")
       ((Oper.Compile.Go oper)
       ((String.Show.Go " ")
-      ((Term.Compile.Go val0 file "")
+      ((Term.Compile.Go val0 file ident)
       ((String.Show.Go " ")
-      ((Term.Compile.Go val1 file "")
+      ((Term.Compile.Go val1 file ident)
       ((String.Show.Go ")")
       x)))))))
   (Term.Compile.Go (Gol name) file ident) =
     λx(x)
   (Term.Compile.Go (All name type body) file ident) =
     λx(x)
-  // TODO Talvez colocar o body entre parenteses aqui (body do tipo U32 compila sem parenteses)
   (Term.Compile.Go (Lam name body) file ident) =
+    let nxt_ident = (String.Concat ident "  ")
     λx((String.Show.Go "@")
       ((String.Show.Go (Name.GetString name))
-      ((String.Show.Go " ")
-      ((Term.Compile.Go body file "")
-      x))))
+      ((String.Show.Go "(")
+      ((Term.Compile.Go body file nxt_ident)
+      ((String.Show.Go ")")
+      x)))))
   (Term.Compile.Go (App func argm) file ident) =
     λx((String.Show.Go "(! ")
-      ((Term.Compile.Go func file "")
+      ((Term.Compile.Go func file ident)
       ((String.Show.Go " ")
-      ((Term.Compile.Go argm file "")
+      ((Term.Compile.Go argm file ident)
       ((String.Show.Go ")")
       x)))))
   (Term.Compile.Go (Cts ctid args) file ident) =
@@ -1815,7 +1816,6 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 
 (File.Compile file func_list) =
   let func_list = (File.Sanitize func_list file)
-  // func_list
   ((File.Compile.Go func_list file) "")
 
   (File.Compile.Go Nil file) =
@@ -1871,18 +1871,18 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
 // =========
 
 // TODO Maybe `file` is unnecessary
-// (File.Sanatize (List Func) File): (List Func)
+// (File.Sanitize (List Func) File): (List Func)
 (File.Sanitize Nil file) =
   Nil
 (File.Sanitize (Cons (Func lhs.t lhs.r rules) terms) file) =
   ((Func.Sanitize lhs.t lhs.r rules) (File.Sanitize terms file))
 
-// (Func.Sanatize Term Term RuleList): (List Func) -> (List Func)
+// (Func.Sanitize Term Term RuleList): (List Func) -> (List Func)
 // Funcs that return an Equal (Eql) are theorems, and are ignored
 (Func.Sanitize _ (Eql _ _) _) =
   λx(x)
 //? Should declarations of types (e.g. Bool: Type) be ignored?
-// (Func.Sanatize _ Typ _) =
+// (Func.Sanitize _ Typ _) =
 //   λx(x)
 // Return the Func with its rules sanitized
 (Func.Sanitize lhs.t lhs.r rules) =
@@ -1908,14 +1908,18 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   // TODO Check `let` usage here (not used || replace || needs dupping)
   (Rules.Sanitize.RHS (Let name expr body)) =
     (Let name (Rules.Sanitize.RHS expr) (Rules.Sanitize.RHS body))
-  // Renames unused lambda vars to "~"
   (Rules.Sanitize.RHS (Lam name body)) =
-    let new_name = (U32.If
-      (== (Uses name body) 0)
-      (Name.Make "~")
-      (name)
-    )
-    (Lam new_name (Rules.Sanitize.RHS body))
+    let uses = (Uses name body)
+    (Rules.Sanitize.RHS.Lam uses (Lam name body))
+
+    (Rules.Sanitize.RHS.Lam 0 (Lam name body)) =
+      (Lam (Name.Make "~") (Rules.Sanitize.RHS body))
+    (Rules.Sanitize.RHS.Lam 1 (Lam name body)) =
+      (Lam name (Rules.Sanitize.RHS body))
+    (Rules.Sanitize.RHS.Lam n (Lam name body)) =
+      let dup_body = (Term.Duplicator name (Var name) body n)
+      (Lam name (Rules.Sanitize.RHS dup_body))
+
   (Rules.Sanitize.RHS rhs) =
     rhs
 

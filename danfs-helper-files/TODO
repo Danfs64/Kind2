@@ -11,6 +11,16 @@
 * Kdl não é tipada, mas talvez faça sentido ter construtores pros tipos?
   * Ex.: Funções/Ctrs que recebam um Type como arg, que não seja pra tipar outros args?
 
+## Styling Decisions
+
+* RHS de funções:
+  * Inline?
+  * Na linha de baixo, identada?
+* Parenteses de abertura de lambda:
+  * junto do name?
+  * separado?
+  * na linha de baixo?
+
 ## TODO
 
 * FLATTENER
