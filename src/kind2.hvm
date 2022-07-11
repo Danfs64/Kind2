@@ -1901,19 +1901,21 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
       new_body
       (Let name expr new_body)
     )
-
+  (Rules.Sanitize.RemoveUnusedLets (Lam name expr)) =
+    (Lam name (Rules.Sanitize.RemoveUnusedLets expr))
+  (Rules.Sanitize.RemoveUnusedLets (Dup name0 name1 expr body)) =
+    (Dup name0 name1 expr (Rules.Sanitize.RemoveUnusedLets body))
   (Rules.Sanitize.RemoveUnusedLets rhs) =
     rhs
 
   // (Rules.Sanitize.RHS Term): Term
-  // TODO Figure out a way to remove unused lets before everything else
   (Rules.Sanitize.RHS (Let name expr body)) =
     let uses = (Uses name body)
     (Rules.Sanitize.RHS.Let uses (Let name expr body))
 
-    // Unused Let's are removed before this anyway
-    // (Rules.Sanitize.RHS.Let 0 (Let name expr body)) =
-    //   (Rules.Sanitize.RHS body)
+    // This one is redundant. Unused Let's are removed beforehand
+    (Rules.Sanitize.RHS.Let 0 (Let name expr body)) =
+      (Rules.Sanitize.RHS body)
     (Rules.Sanitize.RHS.Let 1 (Let name expr body)) =
       let new_body = (Term.Replace name expr body)
       (Rules.Sanitize.RHS new_body)
@@ -1990,7 +1992,7 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
     let new_argm = (Term.Replace name expr argm)
     (App new_func new_argm)
   (Term.Replace name expr (Cts ctid args)) =
-    let new_args = (Term.Replace.Args name expr args)
+    let new_args = (Term.Replace.Cons name expr args)
     (Cts ctid new_args)
   (Term.Replace name expr (Dup name0 name1 d_expr body)) =
     let new_expr = (Term.Replace name expr d_expr)
@@ -1999,9 +2001,11 @@ FuncEmpty = (Func (Var (Name.Make "?")) (Var (Name.Make "?")) End)
   (Term.Replace name expr body) =
     body
 
-  (Term.Replace.Args name expr (Cons x xs)) =
+  (Term.Replace.Cons name expr Nil) =
+    Nil
+  (Term.Replace.Cons name expr (Cons x xs)) =
     let head = (Term.Replace name expr x)
-    let tail = (Term.Replace name expr xs)
+    let tail = (Term.Replace.Cons name expr xs)
     (Cons head tail)
   (Term.Replace.If 0 name expr body) =
     body

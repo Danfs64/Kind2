@@ -13,6 +13,9 @@
 
 ## Styling Decisions
 
+* Vars usadas nos dups:
+  * No momento: `arg` vira `arg..x`
+  * Colocar pra ser um . só?
 * RHS de funções:
   * Inline?
   * Na linha de baixo, identada?
@@ -24,7 +27,5 @@
 ## TODO
 
 * FLATTENER
-* Sanitizer:
-  * Só fazer os dups depois de apagar os lets não usados: evita dups inúteis
 * Como definir o Initial State de uma Função?
   * Proposta do Kelvin: Para toda função `foo`, existir um `foo.state` - de aridade 0 - declarando o initial state
